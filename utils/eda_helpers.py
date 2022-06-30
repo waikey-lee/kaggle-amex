@@ -4,6 +4,15 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
+# Get specific columns
+def get_cols(df, keys, first=False):
+    if isinstance(keys, str):
+        keys = [keys]
+    if not first:
+        return [ col for col in df.columns if any(key in col for key in keys) ]
+    else:
+        return [ col for col in df.columns if any(col.startswith(key) for key in keys) ]
+
 # Check missing values
 def check_missing_values(df, percent=True):
     null_df = df.isnull().sum()

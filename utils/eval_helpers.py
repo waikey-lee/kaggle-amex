@@ -1,4 +1,3 @@
-# This Python script contains some functions that I written before
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -72,6 +71,27 @@ def amex_metric_np(preds: np.ndarray, target: np.ndarray) -> float:
     g = gini / gini_max
     return 0.5 * (g + d)
 
+# Get evaluation df
+def get_final_metric_df(X: pd.DataFrame, y_true: pd.DataFrame, y_pred: pd.DataFrame):
+    df = (pd.concat([X, y_true, y_pred], axis='columns')
+          .sort_values('prediction', ascending=False))
+    top_four_percent_df = df.copy()
+    top_four_percent_df['weight'] = top_four_percent_df['target'].apply(lambda x: 20 if x==0 else 1)
+    four_pct_cutoff = int(0.04 * top_four_percent_df['weight'].sum())
+    top_four_percent_df['weight_cumsum'] = top_four_percent_df['weight'].cumsum()
+    top_four_percent_df["is_cutoff"] = 0
+    top_four_percent_df.loc[top_four_percent_df['weight_cumsum'] <= four_pct_cutoff, "is_cutoff"] = 1
+    
+    gini_df = df.copy()
+    gini_df['weight'] = gini_df['target'].apply(lambda x: 20 if x==0 else 1)
+    gini_df['random'] = (gini_df['weight'] / gini_df['weight'].sum()).cumsum()
+    total_pos = (gini_df['target'] * gini_df['weight']).sum()
+    gini_df['cum_pos_found'] = (gini_df['target'] * gini_df['weight']).cumsum()
+    gini_df['lorentz'] = gini_df['cum_pos_found'] / total_pos
+    gini_df['gini'] = (gini_df['lorentz'] - gini_df['random']) * gini_df['weight']
+    
+    return top_four_percent_df, gini_df
+    
 # Main metric function, pandas version
 def amex_metric(y_true: pd.DataFrame, y_pred: pd.DataFrame) -> float:
 
@@ -102,7 +122,7 @@ def amex_metric(y_true: pd.DataFrame, y_pred: pd.DataFrame) -> float:
     g = normalized_weighted_gini(y_true, y_pred)
     d = top_four_percent_captured(y_true, y_pred)
 
-    return 0.5 * (g + d)
+    return 0.5 * (g + d), g, d
 
 # Get model prediction by providing model inputs, model and threshold
 def calc_y_pred(X_test, model, threshold=50):
