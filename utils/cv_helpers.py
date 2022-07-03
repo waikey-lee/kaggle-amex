@@ -1,74 +1,32 @@
+import xgboost as xgb
+from sklearn.model_selection import train_test_split
 from time import time
+from eval_helpers import amex_metric_np
 
-def xgb_cv(
-          max_depth,
-          gamma,
-          min_child_weight,
-          max_delta_step,
-          subsample,
-          colsample_bytree
-):
-    global AUCbest
-    global ITERbest
-
-    paramt = {
-              'booster' : 'gbtree',
-              'max_depth' : int(max_depth),
-              'gamma' : gamma,
-              'eta' : 0.1,
-              'objective' : 'binary:logistic',
-              'nthread' : 4,
-              'silent' : True,
-              'eval_metric': 'auc',
-              'subsample' : max(min(subsample, 1), 0),
-              'colsample_bytree' : max(min(colsample_bytree, 1), 0),
-              'min_child_weight' : min_child_weight,
-              'max_delta_step' : int(max_delta_step),
-              'seed' : 1001
-              }
-
-    folds = 5
-    cv_score = 0
-
-    print("\n Search parameters (%d-fold validation):\n %s" % (folds, paramt), file=log_file )
-    log_file.flush()
-
-    xgbc = xgb.cv(
-                    paramt,
-                    dtrain,
-                    num_boost_round = 20000,
-                    stratified = True,
-                    nfold = folds,
-#                    verbose_eval = 10,
-                    early_stopping_rounds = 100,
-                    metrics = 'auc',
-                    show_stdv = True
-               )
-
-# This line would have been on top of this section
-#    with capture() as result:
-
-# After xgb.cv is done, this section puts its output into log file. Train and validation scores 
-# are also extracted in this section. Note the "diff" part in the printout below, which is the 
-# difference between the two scores. Large diff values may indicate that a particular set of 
-# parameters is overfitting, especially if you check the CV portion of it in the log file and find 
-# out that train scores were improving much faster than validation scores.
-
-#    print('', file=log_file)
-#    for line in result[1]:
-#        print(line, file=log_file)
-#    log_file.flush()
-
-    val_score = xgbc['test-auc-mean'].iloc[-1]
-    train_score = xgbc['train-auc-mean'].iloc[-1]
-    print(' Stopped after %d iterations with train-auc = %f val-auc = %f ( diff = %f ) train-gini = %f val-gini = %f' % ( len(xgbc), train_score, val_score, (train_score - val_score), (train_score*2-1),
-(val_score*2-1)) )
-    if ( val_score > AUCbest ):
-        AUCbest = val_score
-        ITERbest = len(xgbc)
-
-    return (val_score*2) - 1
-
+def objective(trial, data, target):
+    
+    train_x, test_x, train_y, test_y = train_test_split(data, target, test_size=0.15, random_state=1020)
+    param = {
+        'tree_method': 'cpu_hist',  # this parameter means using the GPU when training our model to speedup the training process
+        'lambda': trial.suggest_loguniform('lambda', 1e-3, 10.0),
+        'alpha': trial.suggest_loguniform('alpha', 1e-3, 10.0),
+        'colsample_bytree': trial.suggest_categorical('colsample_bytree', [0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9]),
+        'subsample': trial.suggest_categorical('subsample', [0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9]),
+        'learning_rate': trial.suggest_categorical('learning_rate', [0.01, 0.03, 0.05, 0.075, 0.1, 0.15, 0.2]),
+        'n_estimators': trial.suggest_uniform('n_estimators', 500, 5000),
+        'max_depth': trial.suggest_categorical('max_depth', [5, 7, 9, 11, 13, 15, 17]),
+        'random_state': trial.suggest_categorical('random_state', [1020]),
+        'min_child_weight': trial.suggest_int('min_child_weight', 1, 100),
+    }
+    model = xgb.XGBRegressor(**param)  
+    
+    model.fit(train_x, train_y, eval_set=[(test_x, test_y)], early_stopping_rounds=100, verbose=False)
+    
+    preds = model.predict(test_x)
+    
+    metric = amex_metric_np(preds, test_y)
+    
+    return metric
 
 # Reporting util for different optimizers
 def report_perf(optimizer, X, y, title="model", callbacks=None):

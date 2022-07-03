@@ -69,7 +69,7 @@ def amex_metric_np(preds: np.ndarray, target: np.ndarray) -> float:
     gini_max = 10 * n_neg * (n_pos + 20 * n_neg - 19) / (n_pos + 20 * n_neg)
 
     g = gini / gini_max
-    return 0.5 * (g + d)
+    return 0.5 * (g + d), g, d
 
 # Get evaluation df
 def get_final_metric_df(X: pd.DataFrame, y_true: pd.DataFrame, y_pred: pd.DataFrame):
