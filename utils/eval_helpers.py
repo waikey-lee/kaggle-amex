@@ -4,6 +4,44 @@ import pandas as pd
 import seaborn as sns
 from sklearn.metrics import roc_curve, roc_auc_score, precision_recall_curve, average_precision_score
 
+
+def amex_metric(y_true: np.array, y_pred: np.array) -> float:
+
+    # count of positives and negatives
+    n_pos = y_true.sum()
+    n_neg = y_true.shape[0] - n_pos
+
+    # sorting by descring prediction values
+    indices = np.argsort(y_pred)[::-1]
+    preds, target = y_pred[indices], y_true[indices]
+
+    # filter the top 4% by cumulative row weights
+    weight = 20.0 - target * 19.0
+    cum_norm_weight = (weight / weight.sum()).cumsum()
+    four_pct_filter = cum_norm_weight <= 0.04
+
+    # default rate captured at 4%
+    d = target[four_pct_filter].sum() / n_pos
+
+    # weighted gini coefficient
+    lorentz = (target / n_pos).cumsum()
+    gini = ((lorentz - cum_norm_weight) * weight).sum()
+
+    # max weighted gini coefficient
+    gini_max = 10 * n_neg * (1 - 19 / (n_pos + 20 * n_neg))
+
+    # normalized weighted gini coefficient
+    g = gini / gini_max
+
+    return 0.5 * (g + d)
+
+def lgb_amex_metric(y_true, y_pred):
+    """The competition metric with lightgbm's calling convention"""
+    return ('amex',
+            amex_metric(y_true, y_pred),
+            True)
+
+
 # Plot ROC AUC curves for both train and test
 def plot_roc_curves(legits_list, pred_probs_list, labels=["Train", "Test"], title=None):
     fig, ax = plt.subplots(figsize=(15, 8))
@@ -38,9 +76,9 @@ def get_performance_metrics(legits_list, preds_list, labels, metrics, functions)
     return performance_df
 
 # Plot feature importances
-def plot_feature_importance(features, importances, title=None, limit=100):
+def plot_feature_importance(features, importances, title=None, limit=100, ascending=False):
     imp_df = pd.DataFrame(dict(feature=features, feature_importance=importances))
-    imp_df = imp_df.sort_values(by="feature_importance", ascending=False).reset_index(drop=True)
+    imp_df = imp_df.sort_values(by="feature_importance", ascending=ascending).reset_index(drop=True)
     fig, ax = plt.subplots(figsize=(15, 8))
     sns.barplot(x=imp_df.iloc[:limit]["feature_importance"], 
                 y=imp_df.iloc[:limit]["feature"], 
@@ -92,37 +130,37 @@ def get_final_metric_df(X: pd.DataFrame, y_true: pd.DataFrame, y_pred: pd.DataFr
     
     return top_four_percent_df, gini_df
     
-# Main metric function, pandas version
-def amex_metric(y_true: pd.DataFrame, y_pred: pd.DataFrame) -> float:
+# # Main metric function, pandas version
+# def amex_metric(y_true: pd.DataFrame, y_pred: pd.DataFrame) -> float:
 
-    def top_four_percent_captured(y_true: pd.DataFrame, y_pred: pd.DataFrame) -> float:
-        df = (pd.concat([y_true, y_pred], axis='columns')
-              .sort_values('prediction', ascending=False))
-        df['weight'] = df['target'].apply(lambda x: 20 if x==0 else 1)
-        four_pct_cutoff = int(0.04 * df['weight'].sum())
-        df['weight_cumsum'] = df['weight'].cumsum()
-        df_cutoff = df.loc[df['weight_cumsum'] <= four_pct_cutoff]
-        return (df_cutoff['target'] == 1).sum() / (df['target'] == 1).sum()
+#     def top_four_percent_captured(y_true: pd.DataFrame, y_pred: pd.DataFrame) -> float:
+#         df = (pd.concat([y_true, y_pred], axis='columns')
+#               .sort_values('prediction', ascending=False))
+#         df['weight'] = df['target'].apply(lambda x: 20 if x==0 else 1)
+#         four_pct_cutoff = int(0.04 * df['weight'].sum())
+#         df['weight_cumsum'] = df['weight'].cumsum()
+#         df_cutoff = df.loc[df['weight_cumsum'] <= four_pct_cutoff]
+#         return (df_cutoff['target'] == 1).sum() / (df['target'] == 1).sum()
         
-    def weighted_gini(y_true: pd.DataFrame, y_pred: pd.DataFrame) -> float:
-        df = (pd.concat([y_true, y_pred], axis='columns')
-              .sort_values('prediction', ascending=False))
-        df['weight'] = df['target'].apply(lambda x: 20 if x==0 else 1)
-        df['random'] = (df['weight'] / df['weight'].sum()).cumsum()
-        total_pos = (df['target'] * df['weight']).sum()
-        df['cum_pos_found'] = (df['target'] * df['weight']).cumsum()
-        df['lorentz'] = df['cum_pos_found'] / total_pos
-        df['gini'] = (df['lorentz'] - df['random']) * df['weight']
-        return df['gini'].sum()
+#     def weighted_gini(y_true: pd.DataFrame, y_pred: pd.DataFrame) -> float:
+#         df = (pd.concat([y_true, y_pred], axis='columns')
+#               .sort_values('prediction', ascending=False))
+#         df['weight'] = df['target'].apply(lambda x: 20 if x==0 else 1)
+#         df['random'] = (df['weight'] / df['weight'].sum()).cumsum()
+#         total_pos = (df['target'] * df['weight']).sum()
+#         df['cum_pos_found'] = (df['target'] * df['weight']).cumsum()
+#         df['lorentz'] = df['cum_pos_found'] / total_pos
+#         df['gini'] = (df['lorentz'] - df['random']) * df['weight']
+#         return df['gini'].sum()
 
-    def normalized_weighted_gini(y_true: pd.DataFrame, y_pred: pd.DataFrame) -> float:
-        y_true_pred = y_true.rename(columns={'target': 'prediction'})
-        return weighted_gini(y_true, y_pred) / weighted_gini(y_true, y_true_pred)
+#     def normalized_weighted_gini(y_true: pd.DataFrame, y_pred: pd.DataFrame) -> float:
+#         y_true_pred = y_true.rename(columns={'target': 'prediction'})
+#         return weighted_gini(y_true, y_pred) / weighted_gini(y_true, y_true_pred)
 
-    g = normalized_weighted_gini(y_true, y_pred)
-    d = top_four_percent_captured(y_true, y_pred)
+#     g = normalized_weighted_gini(y_true, y_pred)
+#     d = top_four_percent_captured(y_true, y_pred)
 
-    return 0.5 * (g + d), g, d
+#     return 0.5 * (g + d), g, d
 
 # Get model prediction by providing model inputs, model and threshold
 def calc_y_pred(X_test, model, threshold=50):

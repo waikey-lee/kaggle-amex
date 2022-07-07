@@ -23,7 +23,7 @@ def check_missing_values(df, percent=True):
     
 # Function to plot simple barchart
 def plot_bar(df, cat_col, num_col="count", title=None, 
-             horizontal=True, decimal=0, figsize=(15, 8)):
+             horizontal=True, decimal=2, figsize=(15, 8)):
     fig, ax = plt.subplots(figsize=figsize)
     if horizontal:
         sns.barplot(y=df[cat_col], x=df[num_col], ax=ax)
@@ -51,13 +51,20 @@ def plot_missing_proportion_barchart(df, top_n=30, **kwargs):
              **kwargs)
     return missing_prop_df
 
+# Plot scatterplot
+def plot_scatterplot(df, column, column2, hue_column):
+    fig, ax = plt.subplots(figsize=(18, 10))
+    sns.scatterplot(data=df, x=column, y=column2, hue=hue_column, style=hue_column, 
+                    palette="deep", s=7, legend="full")
+    ax.set_title(f"Scatterplot of {column2} (y) against {column} (x)")
+    ax.legend()
+    plt.show()
+
 # Plot count in bar chart & target rate in line chart
-def groupby_catcol_plot(data, groupby_col, target_col="is_delinquent", figsize=(8, 4), rotate90=False, 
+def groupby_catcol_plot(data, groupby_col, target_col="target", figsize=(15, 8), rotate90=False, 
                         labels=None, central_measure="mean", sort_by_count=False):
     temp = data.groupby(groupby_col).agg(target_central=(target_col, central_measure), 
                                          count=(target_col, "count")).reset_index()
-    matplotlib.rc_file_defaults()
-    ax1 = sns.set_style(style=None, rc=None)
     fig, ax1 = plt.subplots(figsize=figsize)
     if rotate90:
         plt.xticks(rotation=90)
@@ -75,5 +82,4 @@ def groupby_catcol_plot(data, groupby_col, target_col="is_delinquent", figsize=(
     if labels is not None:
         ax2.set_xticklabels(labels)
     plt.title(f"{central_measure} of {target_col} (line) and count (bar) across column {groupby_col}")
-    plt.tight_layout()
     plt.show()

@@ -11,14 +11,18 @@ def read_file(path='', usecols=None):
         df = pd.read_feather(path)
     elif path.endswith(".csv"):
         df = pd.read_csv(path)
+    elif path.endswith(".pkl"):
+        df = pd.read_pickle(path)
     else:
         print("Unknown file format")
-    
+    if "customer_ID" not in df.columns:
+        df = df.reset_index()
+    if "index" in df.columns:
+        df = df.rename(columns={"index": 'customer_ID'})
     if "S_2" in df.columns:
         df.S_2 = pd.to_datetime(df.S_2)
         df = df.sort_values(['customer_ID', 'S_2'])
     else:
         df = df.sort_values(['customer_ID'])
-    df = df.reset_index(drop=True)
     print('Shape of data:', df.shape)
     return df
