@@ -1,18 +1,75 @@
-# Integer columns indicate the columns can be round to integer (is float in original csv)
-INTEGER_COLUMNS = ['B_32',
-                   'R_2', 'R_4', 'R_8', 
-                   'R_10', 'R_15', 'R_19', 
-                   'R_20', 'R_21', 'R_22', 'R_23', 'R_24', 'R_25', 'R_28',
-                   'S_6', 
-                   'S_18', 
-                   'S_20', 
-                   'D_86', 'D_87', 'D_92', 'D_93', 'D_94', 'D_96', 
-                   'D_109', 'D_127', 'D_137']
+# Columns to be impute by single value
+FILLNA_COLUMNS = {
+    'D_87': 0  # Means column D_87 need to be fillna(0)
+}
 
-CATEGORY_COLUMNS = ['B_30', 'B_38', 
-                    'D_63', 'D_64', 'D_68', 'D_66', # is Binary 1 or 0
-                    'D_114', 'D_117', 'D_116', # is Binary 1 or 0
-                    'D_120', 'D_126']
+# Columns to generate another column just to see if this column has value
+HAS_VALUE_COLUMNS = [
+    'D_137'
+]
+
+# Binary columns indicate the columns can be round() into 1 and 0 (is float in original csv)
+BINARY_COLUMNS = [
+    'B_8', 
+    'B_32', 'B_33', 
+    'R_2', 'R_4',
+    'R_15', 'R_19',
+    'R_21', 'R_22', 'R_23', 'R_24', 'R_25', 'R_28',
+    'S_6', 
+    'S_18', 'S_20', 
+    'D_86', 
+    'D_93', 'D_94', 'D_96', 
+    'D_109', 
+    'D_127'
+]
+
+# Integer columns indicate the columns can be round to integer (is float in original csv)
+INTEGER_COLUMNS = [
+    'B_31', 
+    'D_103', 
+    'R_8', 
+    'R_10', 
+    'R_20', 
+]
+
+# Categorical columns indicate the columns can be set as categorical
+CATEGORY_COLUMNS = [
+    'B_30', 'B_38', 
+    'D_63', 'D_64', 'D_68', 'D_66', # is Binary 1 or 0
+    'D_92',
+    'D_114', 'D_117', 'D_116', # is Binary 1 or 0
+    'D_120', 'D_126'
+]
+
+# ROUND{i} columns indicate column can be round to i decimal places
+ROUND1_COLUMNS = [
+    'B_18', 
+    'B_21', 'B_22', 'B_27',
+    'B_36', 
+    'B_41'
+]
+
+ROUND05_COLUMNS = [
+    'D_111'
+]
+
+ROUND3_COLUMNS = [
+    'B_29', 
+    'D_102', 
+]
+
+# Numeric columns
+CONTINUOUS_COLUMNS = [
+    'B_1', 'B_2', 'B_3', 'B_4', 'B_5', 'B_6', 'B_7', 'B_9', 
+    'B_10', 'B_11', 'B_12', 'B_13', 'B_14', 'B_15', 'B_16', 'B_17', 'B_19',
+    'B_20', 'B_23', 'B_24', 'B_25', 'B_26', 'B_28',
+    'B_37', 'B_39', 
+    'B_40', 'B_42', 
+    'D_104', 'D_105', 'D_106', 'D_107', 'D_108', 
+    'D_110', 'D_112', 'D_113', 'D_115', 'D_118', 'D_119', 
+    'D_121', 'D_122'
+]
+
 
 MEAN_FEATURES = ['B_1', 'B_2', 'B_3', 'B_4', 'B_5', 'B_6', 'B_8', 'B_9', 
                  'B_10', 'B_11', 'B_12', 'B_13', 'B_14', 'B_15', 'B_16', 'B_17', 'B_18', 'B_19', 
