@@ -11,25 +11,18 @@ HAS_VALUE_COLUMNS = [
 # Binary columns indicate the columns can be round() into 1 and 0 (is float in original csv)
 BINARY_COLUMNS = [
     'B_8', 
-    'B_32', 'B_33', 
+    'B_31', 'B_32', 'B_33', 
     'R_2', 'R_4',
     'R_15', 'R_19',
-    'R_21', 'R_22', 'R_23', 'R_24', 'R_25', 'R_28',
+    'R_21', 'R_22', 'R_23', 'R_24', 'R_25', 'R_27', 'R_28',
     'S_6', 
     'S_18', 'S_20', 
+    'D_54', 
     'D_86', 
     'D_93', 'D_94', 'D_96', 
-    'D_109', 
-    'D_127'
-]
-
-# Integer columns indicate the columns can be round to integer (is float in original csv)
-INTEGER_COLUMNS = [
-    'B_31', 
-    'D_103', 
-    'R_8', 
-    'R_10', 
-    'R_20', 
+    'D_103', 'D_109', 
+    'D_127', 'D_128', 'D_129', 
+    'D_130', 'D_135', 'D_139', 'D_140', 'D_143'
 ]
 
 # Categorical columns indicate the columns can be set as categorical
@@ -41,35 +34,86 @@ CATEGORY_COLUMNS = [
     'D_120', 'D_126'
 ]
 
-# ROUND{i} columns indicate column can be round to i decimal places
-ROUND1_COLUMNS = [
-    'B_18', 
-    'B_21', 'B_22', 'B_27',
-    'B_36', 
-    'B_41'
-]
-
-ROUND05_COLUMNS = [
-    'D_111'
-]
-
-ROUND3_COLUMNS = [
-    'B_29', 
-    'D_102', 
-]
-
-# Numeric columns
+# Numeric columns (Requires no extra rounding)
 CONTINUOUS_COLUMNS = [
     'B_1', 'B_2', 'B_3', 'B_4', 'B_5', 'B_6', 'B_7', 'B_9', 
     'B_10', 'B_11', 'B_12', 'B_13', 'B_14', 'B_15', 'B_16', 'B_17', 'B_19',
-    'B_20', 'B_23', 'B_24', 'B_25', 'B_26', 'B_28',
-    'B_37', 'B_39', 
+    'B_20', 'B_21', 'B_23', 'B_24', 'B_25', 'B_26', 'B_27', 'B_28',
+    'B_36', 'B_37', 'B_39', 
     'B_40', 'B_42', 
+    'D_42', 'D_43', 'D_45', 'D_46', 'D_47', 'D_48', 'D_49', 
+    'D_50', 'D_53', 'D_55', 'D_56', 
+    'D_60', 'D_61', 'D_62', 'D_65', 
+    'D_71', 'D_76', 'D_73', 'D_77', 
+    'D_88', 
     'D_104', 'D_105', 'D_106', 'D_107', 'D_108', 
     'D_110', 'D_112', 'D_113', 'D_115', 'D_118', 'D_119', 
-    'D_121', 'D_122'
+    'D_121', 'D_122', 'D_124',
+    'D_132', 'D_134',
+    'D_142',
+    'P_2', 'P_3', 
+    'R_1', 'R_6', 'R_7', 
+    'R_12', 'R_14', 'R_18', 
+    'R_26', 
+    'S_3', 'S_5', 'S_7', 'S_9', 
+    'S_12', 'S_16', 'S_17', 'S_19', 
+    'S_22', 'S_23', 'S_24', 'S_26', 'S_27', 
 ]
 
+# ROUND COLUMNS, key = column to round, value = multiply before rounding to integer
+ROUND_COLUMNS = {
+    'B_18': 10,
+    'B_22': 2,
+    'B_41': 1, 
+    'D_44': 10, 
+    'D_51': 10/3,
+    'D_70': 4, 
+    'D_72': 10/3,
+    'D_78': 2,
+    'D_79': 2,
+    'D_80': 5,
+    'D_81': 1, 
+    'D_82': 2,
+    'D_83': 1,
+    'D_84': 2,
+    'D_89': 9,
+    'D_91': 2,
+    'D_111': 1/8,
+    'D_123': 1,
+    'D_125': 1, 
+    'D_136': 4,
+    'D_138': 2,
+    'D_145': 10,
+    'R_3': 10, 
+    'R_5': 2, 
+    'R_8': 1, 
+    'R_9': 6, 
+    'R_10': 1, 
+    'R_11': 2,
+    'R_13': 30,
+    'R_16': 2, 
+    'R_17': 100/3,
+    'R_20': 1, 
+    'S_11': 25, # +5
+    'S_13': 25, 
+    'S_15': 10, # +2
+}
+
+# Columns required special handling
+SPECIAL_COLUMNS = [
+    'B_29', 
+    'D_39', 
+    'D_41',
+    'D_52', 'D_58', 'D_59',
+    'D_69', 
+    'D_74', 'D_75', 
+    'D_102', 
+    'D_131', 'D_133',
+    'D_141', 'D_144', 
+    'P_4',
+    'S_8', 
+    'S_25', 
+]
 
 MEAN_FEATURES = ['B_1', 'B_2', 'B_3', 'B_4', 'B_5', 'B_6', 'B_8', 'B_9', 
                  'B_10', 'B_11', 'B_12', 'B_13', 'B_14', 'B_15', 'B_16', 'B_17', 'B_18', 'B_19', 
