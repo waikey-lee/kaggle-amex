@@ -51,6 +51,22 @@ def plot_missing_proportion_barchart(df, top_n=30, **kwargs):
              **kwargs)
     return missing_prop_df
 
+# Check missing value x target distribution
+def single_column_null_check(df, column):
+    null_proportion = df.loc[df[column].isnull()]
+    print(f"{null_proportion.shape[0]} null count, {null_proportion.shape[0] / df.shape[0]:.3f} null proportion")
+    print(f"{null_proportion['target'].mean():.4f} of the targets have label = 1")
+    
+    summary = pd.DataFrame(
+        dict(
+            positive_target=df.groupby([column])["target"].mean(), 
+            count_distribution=df[column].value_counts(),
+            proportion_distribution=df[column].value_counts(normalize=True)
+        )
+    ).reset_index()
+    summary = summary.rename(columns={"index": column})
+    return summary
+
 # Plot scatterplot
 def plot_scatterplot(df, column, column2, hue_column):
     fig, ax = plt.subplots(figsize=(18, 10))
@@ -58,28 +74,4 @@ def plot_scatterplot(df, column, column2, hue_column):
                     palette="deep", s=7, legend="full")
     ax.set_title(f"Scatterplot of {column2} (y) against {column} (x)")
     ax.legend()
-    plt.show()
-
-# Plot count in bar chart & target rate in line chart
-def groupby_catcol_plot(data, groupby_col, target_col="target", figsize=(15, 8), rotate90=False, 
-                        labels=None, central_measure="mean", sort_by_count=False):
-    temp = data.groupby(groupby_col).agg(target_central=(target_col, central_measure), 
-                                         count=(target_col, "count")).reset_index()
-    fig, ax1 = plt.subplots(figsize=figsize)
-    if rotate90:
-        plt.xticks(rotation=90)
-    if sort_by_count:
-        temp = temp.sort_values(by="count")
-        sns.barplot(data=temp, x=groupby_col, y='count', alpha=0.5, ax=ax1)
-        ax2 = ax1.twinx()
-        sns.lineplot(data=temp["target_central"], marker='o', ax=ax2)
-    else:
-        temp = temp.sort_values(by="target_central")
-        sns.lineplot(data=temp["target_central"], marker='o', ax=ax1)
-        ax2 = ax1.twinx()
-        sns.barplot(data=temp, x=groupby_col, y='count', alpha=0.5, ax=ax2)
-    
-    if labels is not None:
-        ax2.set_xticklabels(labels)
-    plt.title(f"{central_measure} of {target_col} (line) and count (bar) across column {groupby_col}")
     plt.show()
