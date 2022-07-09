@@ -28,7 +28,7 @@ BINARY_COLUMNS = [
 # Categorical columns indicate the columns can be set as categorical
 CATEGORY_COLUMNS = [
     'B_30', 'B_38', 
-    'D_63', 'D_64', 'D_68', 'D_66', # is Binary 1 or 0
+    'D_63', 'D_64', 'D_68',  # is Binary 1 or 0
     'D_92',
     'D_114', 'D_117', 'D_116', # is Binary 1 or 0
     'D_120', 'D_126'
@@ -98,6 +98,13 @@ ROUND_COLUMNS = {
     'S_13': 25, 
     'S_15': 10, # +2
 }
+
+# Columns to switch to int8
+SPECIAL_INT_COLUMNS = [
+    'target',
+    'row_number',
+    'row_number_inv'
+]
 
 # Columns required special handling
 SPECIAL_COLUMNS = [
