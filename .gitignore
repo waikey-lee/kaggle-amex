@@ -1,7 +1,5 @@
 # My data
-processed_data/
 raw_data/
-submissions/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
