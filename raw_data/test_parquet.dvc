@@ -1,0 +1,5 @@
+outs:
+- md5: be09be16bdd26439b4211b4a29ce8216.dir
+  size: 3301666082
+  nfiles: 2
+  path: test_parquet
