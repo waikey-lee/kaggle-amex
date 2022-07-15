@@ -170,6 +170,7 @@ STD_FEATURES = [
     "B_12",
 ]
 
+
 # 1 means higher default rate
 HIGH_DEFAULT_IMBALANCE_BINARIES = ["R_19_last", "R_15_last", "S_20_last"]
 
