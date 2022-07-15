@@ -76,10 +76,10 @@ def get_performance_metrics(legits_list, preds_list, labels, metrics, functions)
     return performance_df
 
 # Plot feature importances
-def plot_feature_importance(features, importances, title=None, limit=100, ascending=False):
+def plot_feature_importance(features, importances, title=None, limit=100, figsize=(15, 8), ascending=False):
     imp_df = pd.DataFrame(dict(feature=features, feature_importance=importances))
     imp_df = imp_df.sort_values(by="feature_importance", ascending=ascending).reset_index(drop=True)
-    fig, ax = plt.subplots(figsize=(15, 8))
+    fig, ax = plt.subplots(figsize=figsize)
     sns.barplot(x=imp_df.iloc[:limit]["feature_importance"], 
                 y=imp_df.iloc[:limit]["feature"], 
                 ax=ax)

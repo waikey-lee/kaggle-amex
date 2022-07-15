@@ -45,6 +45,14 @@ def get_specific_row_df(raw_df):
         rename_suffix="second_last"
     )
     
+    # Get previous value (2nd last) for all features, there will be some missing (for those having only single statement)
+    third_last_df = filter_df_for_feature(
+        df, 
+        cond_col="row_number", 
+        equal_to=3, 
+        rename_suffix="third_last"
+    )
+    
     # Calculate aggregate features
     cid = pd.Categorical(df.pop('customer_ID'), ordered=True)
     
@@ -52,11 +60,12 @@ def get_specific_row_df(raw_df):
         [
             last_df, 
             second_last_df,
+            third_last_df,
             first_df,
         ], 
         axis=1
     )
-    del df, last_df, second_last_df, first_df
+    del df, last_df, second_last_df, third_last_df, first_df
     return all_df
 
 def get_agg_df(raw_df):
