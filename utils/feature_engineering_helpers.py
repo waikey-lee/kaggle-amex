@@ -117,69 +117,65 @@ def get_agg_df(raw_df):
     del avg_, min_, max_, std_
     return all_df
 
-def process_data(df):
-    last_df = df.loc[df["row_number"] == 1]
-    last_df = last_df.set_index("customer_ID")
-    last_df = last_df.drop(columns=NON_FEATURE_COLUMNS, errors="ignore")
-    last_df = last_df.rename(columns={f: f"{f}_last" for f in last_df.columns})
-    gc.collect()
-    
-    first_df = df.loc[df["row_number_inv"] == 1]
-    first_df = first_df.set_index("customer_ID")
-    first_df = first_df.drop(columns=NON_FEATURE_COLUMNS, errors="ignore")
-    first_df = first_df.rename(columns={f: f"{f}_first" for f in first_df.columns})
-    gc.collect()
-    
-    previous_df = df.loc[df["row_number"] == 2]
-    previous_df = previous_df.set_index("customer_ID")
-    previous_df = previous_df.drop(columns=NON_FEATURE_COLUMNS, errors="ignore")
-    previous_df = previous_df.rename(columns={f: f"{f}_previous" for f in previous_df.columns})
-    gc.collect()
-    
-    cid = pd.Categorical(df.pop('customer_ID'), ordered=True)
-    last = (cid != np.roll(cid, -1)) # mask for last statement of every customer
-    first = (cid != np.roll(cid, 0))
-    numeric_columns = list(set(df.columns) - set(CATEGORY_COLUMNS) - set(NON_FEATURE_COLUMNS))
-    all_columns = list(set(numeric_columns).union(set(CATEGORY_COLUMNS)))
-    
-    avg = (df
-      .groupby(cid)
-      .mean()[numeric_columns]
-      .rename(columns={f: f"{f}_avg" for f in numeric_columns})
-    )
-    gc.collect()
-    
-    min_ = (df
-      .groupby(cid)
-      .min()[numeric_columns] 
-      .rename(columns={f: f"{f}_min" for f in numeric_columns})
-    )
-    gc.collect()
-    
-    max_ = (df
-      .groupby(cid)
-      .max()[numeric_columns]
-      .rename(columns={f: f"{f}_max" for f in numeric_columns})
-    )
-    gc.collect()
-    
-    all_df = pd.concat(
-        [
-            avg, 
-            min_, 
-            max_, 
-            last_df, 
-            first_df,
-            previous_df,
-        ], 
-        axis=1
-    )
-    
-    del avg, min_, max_, last_df, first_df, previous_df
-    for col in tqdm(numeric_columns):
-        all_df[f"{col}_range"] = all_df[f"{col}_max"] - all_df[f"{col}_min"]
-        all_df[f"{col}_speed"] = all_df[f"{col}_last"] - all_df[f"{col}_first"]
-        all_df[f"{col}_lag1_diff"] = all_df[f"{col}_last"] - all_df[f"{col}_previous"]
-        all_df[f"{col}_last_lift"] = all_df[f"{col}_last"] - all_df[f"{col}_avg"]
-        all_df[f"{col}_velocity"] = all_df[f"{col}_speed"] / (all_df[f"{col}_range"] + all_df[f"{col}_avg"])
-    return all_df
+def recursive_impute_using_knn(df, corr_df, corr_thr=0.3, corr_search_step_size=0.02, 
+                               predictor_size_thr=5, list_of_k=[99], max_try_threshold=6, 
+                               skip_first_n=0):
+    missing = df.isnull().sum()
+    missing = missing[missing > 0].sort_values()
+    impute_columns = missing.index.tolist()
+
+    for impute_column in impute_columns[skip_first_n:]:
+        print(f"Selecting correlated column with {impute_column}...")
+        curr_corr = corr_thr
+        predictor_columns = []
+        max_tries = 0
+        while len(predictor_columns) < predictor_size_thr and max_tries < max_try_threshold:
+            
+            if curr_corr < corr_thr:
+                print(f"Re-selecting correlated column using {curr_corr}")
+            curr_corr -= corr_search_step_size
+            max_tries += 1
+            
+            high_corr_columns = corr_df.loc[
+                corr_df[impute_column].abs().between(curr_corr, 0.999), impute_column
+            ].sort_values(ascending=False).index.tolist()
+            no_missing_columns = df.isnull().sum()[df.isnull().sum() == 0].index.tolist()
+            predictor_columns = list(set(high_corr_columns).intersection(set(no_missing_columns)))
+            predictor_columns = predictor_columns[:predictor_size_thr]
+        if max_tries >= max_try_threshold:
+            print("Exceed max tries in searching correlated columns, skip this feature")
+            continue
+        train_val_knn = df.loc[~df[impute_column].isnull()]
+        test_knn = df.loc[df[impute_column].isnull()]
+        print(f"{predictor_columns} selected as predictors")
+        if test_knn.shape[0] == 0:
+            print(f"{impute_column} has no missing values, skip\n")
+            continue
+        train_knn, val_knn = train_test_split(train_val_knn, test_size=0.2, random_state=20)
+        print(f"Train, Validation, Test size: {train_knn.shape[0], val_knn.shape[0], test_knn.shape[0]}")
+        min_rmse = np.inf
+        best_k = 0
+        std = df[impute_column].std()
+        print(f"{impute_column} standard deviation: {std:.4f}")
+        for k in list_of_k:
+            knn_model = KNeighborsRegressor(n_neighbors=k).fit(
+                train_knn.loc[:, predictor_columns], 
+                train_knn.loc[:, impute_column]
+            )
+            y_val_pred = knn_model.predict(val_knn.loc[:, predictor_columns])
+            rmse = np.sqrt(mean_squared_error(val_knn.loc[:, impute_column], y_val_pred))
+            print(f"K: {k}, Validation RMSE: {rmse:.5f}")
+            if rmse < min_rmse:
+                min_rmse = rmse
+                best_knn_model = knn_model
+                best_k = k
+        print(f"Best K is {best_k}")
+        if rmse >= std:
+            print(f"Standard deviation smaller than RMSE, stop the imputation")
+            continue
+        df.loc[test_knn.index, impute_column] = best_knn_model.predict(test_knn.loc[:, predictor_columns])
+        if df[impute_column].isnull().sum() > 0:
+            print(f"Please check why column {impute_column} has yet to be imputed")
+        print(f"Imputation done!\n")
+        
+    return df
