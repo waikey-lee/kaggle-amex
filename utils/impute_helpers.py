@@ -21,3 +21,8 @@ def apply_all_fillna(df):
     for col in ["B_39"]:
         df = create_sign_col(df, col=col)
     return df
+
+def interpolate(df, groupby_col, impute_col):
+    return df.groupby(groupby_col)[impute_col].apply(
+        lambda group: group.interpolate(method='index')
+    )

@@ -33,7 +33,7 @@ def amex_metric(y_true: np.array, y_pred: np.array) -> float:
     # normalized weighted gini coefficient
     g = gini / gini_max
 
-    return 0.5 * (g + d)
+    return 0.5 * (g + d), g, d
 
 def lgb_amex_metric(y_true, y_pred):
     """The competition metric with lightgbm's calling convention"""

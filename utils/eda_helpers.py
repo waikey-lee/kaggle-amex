@@ -52,26 +52,42 @@ def plot_missing_proportion_barchart(df, top_n=30, **kwargs):
     return missing_prop_df
 
 # Check missing value x target distribution
-def single_column_null_check(df, column):
+def single_col_target_check(df, column, q=20):
     null_proportion = df.loc[df[column].isnull()]
     print(f"{null_proportion.shape[0]} null count, {null_proportion.shape[0] / df.shape[0]:.3f} null proportion")
     print(f"{null_proportion['target'].mean():.4f} of the targets have label = 1")
     
+    if df[column].nunique() >= 30:
+        df["temp"] = (pd.qcut(df[column], q=q).cat.codes + 1)
+        temp_df = df.loc[df["temp"] > 0]
+        title = f"Target distribution by {q} bins"
+    else:
+        df["temp"] = df[column].copy()
+        temp_df = df.copy()
+        title = "Target distribution by category"
     summary = pd.DataFrame(
         dict(
-            positive_target=df.groupby([column])["target"].mean(), 
-            count_distribution=df[column].value_counts(),
-            proportion_distribution=df[column].value_counts(normalize=True)
+            target_mean=temp_df.groupby(["temp"])["target"].mean(), 
+            count_distribution=temp_df["temp"].value_counts(),
+            proportion_distribution=temp_df["temp"].value_counts(normalize=True)
         )
     ).reset_index()
     summary = summary.rename(columns={"index": column})
+    
+    fig, ax = plt.subplots(figsize=(16, 8))
+    ax2 = ax.twinx()
+    ax2.bar(summary[column], summary["count_distribution"], alpha=0.7)
+    ax.plot(summary[column], summary["target_mean"])
+    plt.title(title)
+    plt.show()
     return summary
 
 # Plot scatterplot
-def plot_scatterplot(df, column, column2, hue_column):
+def plot_scatterplot(df, column, column2, hue_column=None):
     fig, ax = plt.subplots(figsize=(18, 10))
     sns.scatterplot(data=df, x=column, y=column2, hue=hue_column, style=hue_column, 
                     palette="deep", s=7, legend="full")
     ax.set_title(f"Scatterplot of {column2} (y) against {column} (x)")
-    ax.legend()
+    if hue_column is not None:
+        ax.legend()
     plt.show()
