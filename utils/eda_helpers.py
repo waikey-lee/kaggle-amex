@@ -5,13 +5,15 @@ import pandas as pd
 import seaborn as sns
 
 # Get specific columns
-def get_cols(df, keys, first=False):
+def get_cols(df, keys, first=False, excludes=["xyz"]):
     if isinstance(keys, str):
         keys = [keys]
+    if isinstance(excludes, str):
+        excludes = [excludes]
     if not first:
-        return [ col for col in df.columns if any(key in col for key in keys) ]
+        return [ col for col in df.columns if any(key in col for key in keys) and all(exc not in col for exc in excludes) ]
     else:
-        return [ col for col in df.columns if any(col.startswith(key) for key in keys) ]
+        return [ col for col in df.columns if any(col.startswith(key) for key in keys) and all(exc not in col for exc in excludes) ]
 
 # Check missing values
 def check_missing_values(df, percent=True):

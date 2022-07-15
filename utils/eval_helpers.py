@@ -38,7 +38,7 @@ def amex_metric(y_true: np.array, y_pred: np.array) -> float:
 def lgb_amex_metric(y_true, y_pred):
     """The competition metric with lightgbm's calling convention"""
     return ('amex',
-            amex_metric(y_true, y_pred),
+            amex_metric(y_true, y_pred)[0],
             True)
 
 
