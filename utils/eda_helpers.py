@@ -76,8 +76,8 @@ def single_col_target_check(df, column, q=20):
     
     fig, ax = plt.subplots(figsize=(16, 8))
     ax2 = ax.twinx()
-    ax2.bar(summary[column], summary["count_distribution"], alpha=0.7)
-    ax.plot(summary[column], summary["target_mean"])
+    ax2.bar(summary[column], summary["count_distribution"], alpha=0.6)
+    ax.plot(summary[column], summary["target_mean"], color="red")
     plt.title(title)
     plt.show()
     return summary
