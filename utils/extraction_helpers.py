@@ -15,14 +15,16 @@ def read_file(path='', usecols=None):
         df = pd.read_pickle(path)
     else:
         print("Unknown file format")
-    if "customer_ID" not in df.columns:
-        df = df.reset_index()
-    if "index" in df.columns:
-        df = df.rename(columns={"index": 'customer_ID'})
-    if "S_2" in df.columns:
+    if "customer_ID" not in df.columns and df.shape[0] in [5531451, 458913]:
+        df = df.reset_index().rename(columns={"index": 'customer_ID'})
+    if "S_2" in df.columns and 'customer_ID' in df.columns:
         df.S_2 = pd.to_datetime(df.S_2)
         df = df.sort_values(['customer_ID', 'S_2'])
-    else:
+    elif 'customer_ID' in df.columns:
         df = df.sort_values(['customer_ID'])
+    else:
+        pass
+    if df.shape[1] >= 180:
+        df = df.replace(-1, np.nan)
     print('Shape of data:', df.shape)
     return df
