@@ -93,3 +93,9 @@ def plot_scatterplot(df, column, column2, hue_column=None):
     if hue_column is not None:
         ax.legend()
     plt.show()
+    
+# Plot Heatmap
+def plot_heatmap(df, figsize=(15, 8), annot=False):
+    fig, ax = plt.subplots(figsize=figsize)
+    sns.heatmap(data=df, annot=annot, cmap="coolwarm")
+    plt.show()
