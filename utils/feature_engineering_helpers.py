@@ -114,7 +114,61 @@ def get_agg_df(raw_df):
         axis=1
     )
     
-    del avg_, min_, max_, std_
+    del df, avg_, min_, max_, std_
+    return all_df
+
+def get_ma_df(raw_df):
+    df = raw_df.copy()
+    
+    # Calculate aggregate features
+    cid = "customer_ID"
+    # cid = pd.Categorical(df.pop('customer_ID'), ordered=True)
+    numeric_columns = list(set(df.columns) - set(CATEGORY_COLUMNS) - set(NON_FEATURE_COLUMNS))
+    all_columns = list(set(numeric_columns).union(set(CATEGORY_COLUMNS)))
+    
+    ma3_r1 = (df
+      .loc[df["row_number"].between(1, 3)]
+      .groupby(cid)[numeric_columns]
+      .mean()
+      .rename(columns={f: f"{f}_ma3_r1" for f in numeric_columns})
+    )
+    gc.collect()
+    
+    ma3_r2 = (df
+      .loc[df["row_number"].between(4, 6)]
+      .groupby(cid)[numeric_columns]
+      .mean()
+      .rename(columns={f: f"{f}_ma3_r2" for f in numeric_columns})
+    )
+    gc.collect()
+    
+    ma3_r3 = (df
+      .loc[df["row_number"].between(7, 9)]
+      .groupby(cid)[numeric_columns]
+      .mean()
+      .rename(columns={f: f"{f}_ma3_r3" for f in numeric_columns})
+    )
+    gc.collect()
+    
+    ma3_r4 = (df
+      .loc[df["row_number"].between(10, 12)]
+      .groupby(cid)[numeric_columns]
+      .mean()
+      .rename(columns={f: f"{f}_ma3_r4" for f in numeric_columns})
+    )
+    gc.collect()
+    
+    all_df = pd.concat(
+        [
+            ma3_r1, 
+            ma3_r2, 
+            ma3_r3, 
+            ma3_r4
+        ], 
+        axis=1
+    )
+    
+    del df, ma3_r1, ma3_r2, ma3_r3, ma3_r4
     return all_df
 
 def recursive_impute_using_knn(df, corr_df, corr_thr=0.3, corr_search_step_size=0.02, 
