@@ -10,7 +10,7 @@ NON_FEATURE_COLUMNS = [
 # Categorical columns indicate the columns can be set as categorical
 CATEGORY_COLUMNS = [
     'B_30', 'B_38', 
-    'D_63', 'D_64', 'D_68', 'D_92',
+    'D_63', 'D_92',
     'D_114', 'D_117', 'D_116', 'D_120', 'D_126'
 ]
 
