@@ -4,9 +4,7 @@ import pandas as pd
 import seaborn as sns
 from sklearn.metrics import roc_curve, roc_auc_score, precision_recall_curve, average_precision_score
 
-
 def amex_metric(y_true: np.array, y_pred: np.array) -> float:
-
     # count of positives and negatives
     n_pos = y_true.sum()
     n_neg = y_true.shape[0] - n_pos
@@ -35,8 +33,9 @@ def amex_metric(y_true: np.array, y_pred: np.array) -> float:
 
     return 0.5 * (g + d), g, d
 
-def lgb_amex_metric(y_true, y_pred):
+def lgb_amex_metric(y_pred, train_data):
     """The competition metric with lightgbm's calling convention"""
+    y_true = train_data.get_label()
     return ('amex',
             amex_metric(y_true, y_pred)[0],
             True)
@@ -113,22 +112,17 @@ def amex_metric_np(preds: np.ndarray, target: np.ndarray) -> float:
 def get_final_metric_df(X: pd.DataFrame, y_true: pd.DataFrame, y_pred: pd.DataFrame):
     df = (pd.concat([X, y_true, y_pred], axis='columns')
           .sort_values('prediction', ascending=False))
-    top_four_percent_df = df.copy()
-    top_four_percent_df['weight'] = top_four_percent_df['target'].apply(lambda x: 20 if x==0 else 1)
-    four_pct_cutoff = int(0.04 * top_four_percent_df['weight'].sum())
-    top_four_percent_df['weight_cumsum'] = top_four_percent_df['weight'].cumsum()
-    top_four_percent_df["is_cutoff"] = 0
-    top_four_percent_df.loc[top_four_percent_df['weight_cumsum'] <= four_pct_cutoff, "is_cutoff"] = 1
-    
-    gini_df = df.copy()
-    gini_df['weight'] = gini_df['target'].apply(lambda x: 20 if x==0 else 1)
-    gini_df['random'] = (gini_df['weight'] / gini_df['weight'].sum()).cumsum()
-    total_pos = (gini_df['target'] * gini_df['weight']).sum()
-    gini_df['cum_pos_found'] = (gini_df['target'] * gini_df['weight']).cumsum()
-    gini_df['lorentz'] = gini_df['cum_pos_found'] / total_pos
-    gini_df['gini'] = (gini_df['lorentz'] - gini_df['random']) * gini_df['weight']
-    
-    return top_four_percent_df, gini_df
+    df['weight'] = df['target'].apply(lambda x: 20 if x==0 else 1)
+    four_pct_cutoff = int(0.04 * df['weight'].sum())
+    df['weight_cumsum'] = df['weight'].cumsum()
+    df["is_cutoff"] = 0
+    df.loc[df['weight_cumsum'] <= four_pct_cutoff, "is_cutoff"] = 1
+    df['random'] = (df['weight'] / df['weight'].sum()).cumsum()
+    total_pos = (df['target'] * df['weight']).sum()
+    df['cum_pos_found'] = (df['target'] * df['weight']).cumsum()
+    df['lorentz'] = df['cum_pos_found'] / total_pos
+    df['gini'] = (df['lorentz'] - df['random']) * df['weight']
+    return df
     
 # # Main metric function, pandas version
 # def amex_metric(y_true: pd.DataFrame, y_pred: pd.DataFrame) -> float:

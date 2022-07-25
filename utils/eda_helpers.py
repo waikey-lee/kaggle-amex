@@ -49,7 +49,7 @@ def plot_bar(df, cat_col, num_col="count", title=None,
         sns.barplot(y=df[cat_col], x=df[num_col], ax=ax)
         for idx, value in enumerate(df[num_col]):
             display_value = round(value, decimal)
-            plt.text(value, idx, display_value)
+            plt.text(value, idx + 0.2, display_value)
     else:
         sns.barplot(x=df[cat_col].astype(str), y=df[num_col], ax=ax)
         for idx, value in enumerate(df[num_col]):
@@ -66,8 +66,7 @@ def plot_missing_proportion_barchart(df, top_n=30, **kwargs):
                                                   ascending=False)
     plot_bar(missing_prop_df.iloc[:top_n], 
              cat_col="column",
-             num_col="missing_proportion", 
-             title="Missing Proportion in each columns",
+             num_col="missing_proportion",
              **kwargs)
     return missing_prop_df
 
@@ -78,7 +77,7 @@ def plot_target_check(df, column, q=20, return_df=False, figsize=(18, 8)):
     print(f"{null_proportion['target'].mean():.4f} of the targets have label = 1")
     
     if df[column].nunique() >= 100:
-        df["temp"] = pd.qcut(df[column], q=q).cat.codes
+        df["temp"] = pd.qcut(df[column], q=q, duplicates="drop").cat.codes
         title = f"Target distribution by {q} bins"
     else:
         df["temp"] = df[column].copy()
@@ -164,6 +163,10 @@ def plot_train_test_distribution(train, test, col, figsize=(18, 8), q=100):
 def check_overlap_missing(df, col1, col2, n1=np.nan, n2=np.nan):
     col1_null_indices = df.loc[df[col1] == n1].index
     col2_null_indices = df.loc[df[col2] == n2].index
+    if n1 != n1:
+        col1_null_indices = df.loc[df[col1].isnull()].index
+    if n2 != n2:
+        col2_null_indices = df.loc[df[col2].isnull()].index
     print(f"{col1} missing count {len(col1_null_indices)}")
     print(f"{col2} missing count {len(col2_null_indices)}")
     print(f"Both {col1} & {col2} missing count {len(set(col1_null_indices).intersection(set(col2_null_indices)))}")

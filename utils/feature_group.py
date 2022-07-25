@@ -4,6 +4,7 @@ NON_FEATURE_COLUMNS = [
     'target',
     'row_number',
     'row_number_inv',
+    # 'num_statements',
     'S_2'
 ]
 
