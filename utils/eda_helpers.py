@@ -71,13 +71,16 @@ def plot_missing_proportion_barchart(df, top_n=30, **kwargs):
     return missing_prop_df
 
 # Check missing value x target distribution
-def plot_target_check(df, column, q=20, return_df=False, figsize=(18, 8)):
+def plot_target_check(df, column, q=20, return_df=False, figsize=(18, 8), use_raw_bin=False):
     null_proportion = df.loc[df[column].isnull()]
     print(f"{null_proportion.shape[0]} null count, {null_proportion.shape[0] / df.shape[0]:.3f} null proportion")
     print(f"{null_proportion['target'].mean():.4f} of the targets have label = 1")
     
     if df[column].nunique() >= 100:
-        df["temp"] = pd.qcut(df[column], q=q, duplicates="drop").cat.codes
+        if not use_raw_bin:
+            df["temp"] = pd.qcut(df[column], q=q, duplicates="drop").cat.codes
+        else:
+            df["temp"] = pd.qcut(df[column], q=q, duplicates="drop")
         title = f"Target distribution by {q} bins"
     else:
         df["temp"] = df[column].copy()
@@ -91,13 +94,26 @@ def plot_target_check(df, column, q=20, return_df=False, figsize=(18, 8)):
     ).reset_index()
     summary = summary.rename(columns={"index": column})
     
+    if df[column].nunique() >= 100 and use_raw_bin:
+        adjusted_x_series = summary[column].apply(lambda x: pd.Interval(left=round(x.left, 4), right=round(x.right, 4))).astype(str)
+    else:
+        adjusted_x_series = summary[column]
     fig, ax = plt.subplots(figsize=figsize)
     ax2 = ax.twinx()
-    ax2.bar(summary[column], summary["proportion_distribution"], color="red", alpha=0.6)
+    ax2.bar(
+        adjusted_x_series, 
+        summary["proportion_distribution"], 
+        color="red", 
+        alpha=0.6
+    )
     ax2.set_ylabel("Count Proportion (sum to 100)", color="red")
-    ax.plot(summary[column], summary["target_mean"], color="orange")
+    ax.plot(
+        adjusted_x_series, 
+        summary["target_mean"], 
+        color="orange"
+    )
     ax.set_ylabel("Target Positive Proportion", color="orange")
-    
+    fig.autofmt_xdate(rotation=45)
     plt.title(title)
     plt.show()
     if return_df:

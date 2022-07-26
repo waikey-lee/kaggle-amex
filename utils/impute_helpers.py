@@ -22,7 +22,41 @@ def apply_all_fillna(df):
         df = create_sign_col(df, col=col)
     return df
 
-def interpolate(df, groupby_col, impute_col):
-    return df.groupby(groupby_col)[impute_col].apply(
-        lambda group: group.interpolate(method='index')
-    )
+def interpolate_series(x, method, order):
+    try:
+        series = x.interpolate(method=method, order=order)
+    except:
+        series = x
+    return series
+
+def impute_col(df, col, method, order=1):
+    if method == 0:
+        # No imputation
+        return df[col]
+        
+    elif method == 1:
+        # Impute with global mean directly
+        return df[col].fillna(df[col].mean())
+        
+    elif method == 2:
+        # Impute with respective group mean
+        df[col] = df.groupby("customer_ID")[col].transform(lambda x: x.fillna(x.mean()))
+        return df[col].fillna(df[col].mean())
+    
+    elif method == 3:
+        # Impute using (certain order) polynomial interpolation
+        m = "polynomial"
+        df[col] = df.groupby("customer_ID")[col].transform(lambda x: interpolate_series(x, m, order))
+        df[col] = df.groupby("customer_ID")[col].transform(lambda x: x.ffill().bfill())
+        return df[col].fillna(df[col].mean())
+    
+    elif method == 4:
+        # Impute using (certain order) spline interpolation
+        m = "spline"
+        # return 
+        df[col] = df.groupby("customer_ID")[col].transform(lambda x: interpolate_series(x, m, order))
+        df[col] = df.groupby("customer_ID")[col].transform(lambda x: x.ffill().bfill())
+        return df[col].fillna(df[col].mean())
+    
+    else:
+        pass
