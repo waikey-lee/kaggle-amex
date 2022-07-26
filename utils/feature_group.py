@@ -11,8 +11,8 @@ NON_FEATURE_COLUMNS = [
 # Categorical columns indicate the columns can be set as categorical
 CATEGORY_COLUMNS = [
     'B_30', 'B_38', 
-    'D_63', 'D_92',
-    'D_114', 'D_117', 'D_116', 'D_120', 'D_126'
+    'D_63', 'D_64', 'D_68', 
+    'D_92', 'D_114', 'D_116', 'D_117', 'D_120', 'D_126'
 ]
 
 MEAN_FEATURES = ['B_1', 'B_2', 'B_3', 'B_4', 'B_5', 'B_6', 'B_8', 'B_9', 
