@@ -71,12 +71,13 @@ def plot_missing_proportion_barchart(df, top_n=30, **kwargs):
     return missing_prop_df
 
 # Check missing value x target distribution
-def plot_target_check(df, column, q=20, return_df=False, figsize=(18, 8), use_raw_bin=False):
+def plot_target_check(df, column, q=20, return_df=False, figsize=(18, 8), 
+                      use_raw_bin=False, strfy_x=False, nunique_thr=100, drop_outlier=False):
     null_proportion = df.loc[df[column].isnull()]
     print(f"{null_proportion.shape[0]} null count, {null_proportion.shape[0] / df.shape[0]:.3f} null proportion")
     print(f"{null_proportion['target'].mean():.4f} of the targets have label = 1")
-    
-    if df[column].nunique() >= 100:
+        
+    if df[column].nunique() >= nunique_thr:
         if not use_raw_bin:
             df["temp"] = pd.qcut(df[column], q=q, duplicates="drop").cat.codes
         else:
@@ -93,9 +94,14 @@ def plot_target_check(df, column, q=20, return_df=False, figsize=(18, 8), use_ra
         )
     ).reset_index()
     summary = summary.rename(columns={"index": column})
+    if df[column].nunique() < nunique_thr and nunique_thr >= 100:
+        print("Bottom 1% and Top 1% are dropped from this chart")
+        summary = summary.loc[summary[column].between(np.percentile(df[column].dropna(), 1), np.percentile(df[column].dropna(), 99))]
     
-    if df[column].nunique() >= 100 and use_raw_bin:
+    if df[column].nunique() >= nunique_thr and use_raw_bin:
         adjusted_x_series = summary[column].apply(lambda x: pd.Interval(left=round(x.left, 4), right=round(x.right, 4))).astype(str)
+    elif strfy_x:
+        adjusted_x_series = summary[column].round(2).astype(str)
     else:
         adjusted_x_series = summary[column]
     fig, ax = plt.subplots(figsize=figsize)
@@ -150,12 +156,12 @@ def plot_int_feature_distribution(train, test, col):
 
     plt.show()
     
-def plot_train_test_distribution(train, test, col, figsize=(18, 8), q=100):
+def plot_train_test_distribution(train, test, col, figsize=(18, 8), q=100, 
+                                 nunique_thr=100):
     fig, ax = plt.subplots(figsize=figsize)
-    if train[col].nunique() >= 100:
+    if train[col].nunique() >= nunique_thr:
         train[col].plot.kde(color='yellow')
         test[col].plot.kde(color='green')
-        plt.show()
     else:
         train["temp"] = train[col]
         test["temp"] = test[col]
@@ -166,15 +172,21 @@ def plot_train_test_distribution(train, test, col, figsize=(18, 8), q=100):
             on="index",
             how="outer"
         ).rename(columns={"index": col}).sort_values(by=col).reset_index(drop=True)
+        
+        if train[col].nunique() < nunique_thr and nunique_thr >= 100:
+            print("Bottom 1% and Top 1% are dropped from this chart")
+            proportion_count_df = proportion_count_df.loc[proportion_count_df[col].between(np.percentile(train[col].dropna(), 1), np.percentile(train[col].dropna(), 99))]
+        
         X_axis = np.arange(proportion_count_df.shape[0])
         plt.bar(X_axis - 0.2, proportion_count_df["train_count"], 0.4, label='Train')
         plt.bar(X_axis + 0.2, proportion_count_df["test_count"], 0.4, label='Test')
-        plt.xticks(X_axis, proportion_count_df[col])
+        plt.xticks(X_axis, proportion_count_df[col].round(2))
         plt.xlabel(col)
         plt.ylabel("Proportion of records")
         ax.set_title(f"Train Test Distribution for {col}")
         plt.legend()
-        plt.show()
+    fig.autofmt_xdate(rotation=45)
+    plt.show()
     
 def check_overlap_missing(df, col1, col2, n1=np.nan, n2=np.nan):
     col1_null_indices = df.loc[df[col1] == n1].index
