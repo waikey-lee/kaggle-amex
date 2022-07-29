@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-def read_file(path='', usecols=None, sort=False, replace_negative_one=True):
+def read_file(path='', usecols=None, sort=False, replace_negative_one=False, replace_negative127=True):
     # LOAD DATAFRAME
     if path.endswith(".parquet"):
         if usecols is not None:
@@ -33,6 +33,8 @@ def read_file(path='', usecols=None, sort=False, replace_negative_one=True):
         else:
             print("Nothing to sort")
             pass
+    if replace_negative127:
+        df = df.replace(-127, np.nan)
     if replace_negative_one:
         if df.shape[1] >= 180:
             df = df.replace(-1, np.nan)
