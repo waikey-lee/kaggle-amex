@@ -3,16 +3,13 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import random
 import seaborn as sns
 from matplotlib.ticker import MaxNLocator
 from matplotlib.colors import ListedColormap
 from cycler import cycler
 from IPython.display import display
 from colorama import Fore, Back, Style
-plt.rcParams['axes.facecolor'] = '#0057b8' # blue
-plt.rcParams['axes.prop_cycle'] = cycler(color=['#ffd700'] +
-                                         plt.rcParams['axes.prop_cycle'].by_key()['color'][1:])
-plt.rcParams['text.color'] = 'w'
 
 # Insert row number to indicate which credit card statement for each particular record
 def insert_row_number(df):
@@ -76,7 +73,7 @@ def plot_target_check(df, column, q=20, return_df=False, figsize=(18, 8),
     null_proportion = df.loc[df[column].isnull()]
     print(f"{null_proportion.shape[0]} null count, {null_proportion.shape[0] / df.shape[0]:.3f} null proportion")
     print(f"{null_proportion['target'].mean():.4f} of the targets have label = 1")
-        
+    
     if df[column].nunique() >= nunique_thr:
         if not use_raw_bin:
             df["temp"] = pd.qcut(df[column], q=q, duplicates="drop").cat.codes
@@ -104,15 +101,19 @@ def plot_target_check(df, column, q=20, return_df=False, figsize=(18, 8),
         adjusted_x_series = summary[column].round(2).astype(str)
     else:
         adjusted_x_series = summary[column]
+        
+    plt.rcParams['axes.facecolor'] = '#0057b8' # blue
+    plt.rcParams['axes.prop_cycle'] = cycler(color=['#ffd700'] + plt.rcParams['axes.prop_cycle'].by_key()['color'][1:])
+    plt.rcParams['text.color'] = 'w'
     fig, ax = plt.subplots(figsize=figsize)
     ax2 = ax.twinx()
     ax2.bar(
         adjusted_x_series, 
         summary["proportion_distribution"], 
-        color="red", 
-        alpha=0.6
+        color="maroon", 
+        alpha=0.5
     )
-    ax2.set_ylabel("Count Proportion (sum to 100)", color="red")
+    ax2.set_ylabel("Count Proportion (sum to 100)", color="maroon")
     ax.plot(
         adjusted_x_series, 
         summary["target_mean"], 
@@ -178,8 +179,8 @@ def plot_train_test_distribution(train, test, col, figsize=(18, 8), q=100,
             proportion_count_df = proportion_count_df.loc[proportion_count_df[col].between(np.percentile(train[col].dropna(), 1), np.percentile(train[col].dropna(), 99))]
         
         X_axis = np.arange(proportion_count_df.shape[0])
-        plt.bar(X_axis - 0.2, proportion_count_df["train_count"], 0.4, label='Train')
-        plt.bar(X_axis + 0.2, proportion_count_df["test_count"], 0.4, label='Test')
+        plt.bar(X_axis - 0.2, proportion_count_df["train_count"], 0.4, label='Train', alpha=0.8)
+        plt.bar(X_axis + 0.2, proportion_count_df["test_count"], 0.4, label='Test', alpha=0.8)
         plt.xticks(X_axis, proportion_count_df[col].round(2))
         plt.xlabel(col)
         plt.ylabel("Proportion of records")
@@ -198,3 +199,32 @@ def check_overlap_missing(df, col1, col2, n1=np.nan, n2=np.nan):
     print(f"{col1} missing count {len(col1_null_indices)}")
     print(f"{col2} missing count {len(col2_null_indices)}")
     print(f"Both {col1} & {col2} missing count {len(set(col1_null_indices).intersection(set(col2_null_indices)))}")
+    
+def plot_sampled_time_series(train, labels, column, sample_size, pad_values=-1, common_y_axis=True):
+    plt.rcParams['axes.facecolor'] = '#ffffff'
+    plt.rcParams['axes.prop_cycle'] = cycler(color=['#000000'] + plt.rcParams['axes.prop_cycle'].by_key()['color'][1:])
+    plt.rcParams['text.color'] = 'w'
+    train_cid_list = train["customer_ID"].unique().tolist()
+    row = int(sample_size / 4)
+    fig, ax = plt.subplots(row + 1, 4, figsize=(24, int(row * 3)))
+    ax = ax.ravel()
+    temp = random.sample(range(len(train_cid_list)), sample_size)
+    sampled_cid_list = [train_cid_list[i] for i in temp]
+    if common_y_axis:
+        min_ = train[column].min() - 0.1 * train[column].std()
+        max_ = train[column].max() + 0.1 * train[column].std()
+    for i in range(sample_size):
+        ax_ = ax[i]
+        cid_ = sampled_cid_list[i]
+        array = train.loc[train["customer_ID"] == cid_, column].values
+        array = np.pad(array, pad_width=(13 - len(array), 0), mode="constant", constant_values=(pad_values))
+        target_ = labels.loc[labels["customer_ID"] == cid_, "target"].values[0]
+        if target_ == 1:
+            ax_.plot(range(13), array, color="red")
+        else:
+            ax_.plot(range(13), array, color="blue")
+        if common_y_axis:
+            ax_.set_ylim((min_, max_))
+        ax_.set_title(cid_)
+    plt.suptitle(column)
+    plt.show()
