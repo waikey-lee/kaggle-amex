@@ -1,5 +1,8 @@
+import joblib
+import json
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 import pandas as pd
 import seaborn as sns
 from sklearn.metrics import roc_curve, roc_auc_score, precision_recall_curve, average_precision_score
@@ -156,152 +159,175 @@ def get_final_metric_df(X: pd.DataFrame, y_true: pd.DataFrame, y_pred: pd.DataFr
 
 #     return 0.5 * (g + d), g, d
 
-# Get model prediction by providing model inputs, model and threshold
-def calc_y_pred(X_test, model, threshold=50):
-    y_pred_score = model.predict_proba(X_test)[:, 1]
-    y_score_percentiles = [np.percentile(y_pred_score, i*5) for i in range(21)]
-    exact_score_thresh = y_score_percentiles[threshold // 5]
-    y_pred = (y_pred_score > exact_score_thresh).astype(int)
-    return y_pred, exact_score_thresh
-
-# Plot confusion matrix
-def plot_confusion_matrix(df, metrics):
-    plt.figure(figsize=(9, 7))
-    sns.heatmap(df, cmap="coolwarm", annot=True, fmt=".0f")
-    plt.show()
-
-# Get model performance metrics for various threshold
-def get_threshold_metrics_df(X_test, y_test, model):
-    performance_metrics_list = []
-    for threshold in range(1, 20):
-        y_pred, score_thresh = calc_y_pred(X_test, model, threshold=threshold * 5)
-        confusion_matrix, performance_metrics = calc_metrics(y_test, y_pred)
-        performance_metrics["score_threshold_percentile"] = int(threshold * 5)
-        performance_metrics["score_threshold"] = score_thresh
-        performance_metrics_list.append(performance_metrics)
-    metrics_df = pd.DataFrame(performance_metrics_list)
-    return metrics_df
-
-# Plot model performance metrics across thresholds
-def plot_threshold_metrics(df, optim_metric=None, metrics=None, thresh_col="score_threshold"):
-    if metrics is None:
-        metrics = [col for col in df.columns if col != thresh_col]
-    if optim_metric is None:
-        optim_metric = metrics[0]
-    optim_row = df.loc[df[optim_metric].argmax()]
-    fig, ax = plt.subplots(figsize=(15, 7))
-    ax.axvline(x=optim_row[thresh_col], linestyle="--", color="red")
-    for col in metrics:
-        try:
-            ax.plot(df[thresh_col], df[col], label=col)
-        except:
-            print(f"Metric {col} can't found")
+class LGBM:
+    def __init__(self, exp_full_path, val_indices=None):
+        self.path = exp_full_path
+        self.target = []
+        self.val_indices = val_indices
+        self.models = {}
+        self.feature_names = {}
+        self.feature_importances = {}
+        self.val_metrics = [0, 0, 0]
+        self.master_feature_set = set()
+        self.feature_imp_df = pd.DataFrame()
+        self.feature_imp_summary = pd.DataFrame()
+        self.read_models()
+        self.get_master_feature_set()
+        self.get_feature_importance_summary()
     
-    ax.legend()
-    plt.title("Performance metrics across threshold")
-    plt.show()
-    return dict(optim_row)
-
-# Plot business metrics across thresholds
-def plot_business_metrics(X_test, test, model):
-    business_metrics_list, thresh_list = [], []
-    for t in range(5, 100, 5):
-        thresh = t / 100
-        y_pred_test = (model.predict_proba(X_test)[:, 1] >= thresh).astype(int)
-        bm = calc_business_metrics(test, y_pred_test)
-        thresh_list.append(thresh)
-        business_metrics_list.append(bm)
+    def read_models(self):
+        model_paths = [file for file in sorted(os.listdir(f"{self.path}/models")) if file.startswith("model")]
+        for i, model_path in enumerate(model_paths):
+            self.models[i] = joblib.load(f"{self.path}/models/{model_path}")
+            try:
+                feature_name = self.models[i].feature_name()
+                feature_imp = self.models[i].feature_importance()
+            except:
+                feature_name = self.models[i].feature_name_
+                feature_imp = self.models[i].feature_importances_
+            self.feature_names[i] = feature_name
+            self.feature_importances[i] = feature_imp
     
-    result = pd.DataFrame(business_metrics_list)
-    result["threshold"] = thresh_list
-    optim_row = result.loc[result["Estimated revenue lift (times)"].argmax()]
+    def get_master_feature_set(self):
+        for feature_names in self.feature_names.values():
+            self.master_feature_set = self.master_feature_set.union(feature_names)
     
-    fig, ax1 = plt.subplots(figsize=(15, 7))
-    ax1.axvline(x=optim_row["threshold"], linestyle="--", color="red")
-    for col in result.drop(columns=["threshold", "Estimated revenue lift (times)"]):
-        try:
-            ax1.plot(result["threshold"], result[col], label=col)
-        except:
-            print(f"Metric {col} can't found")
-    ax2 = ax1.twinx()
-    ax2.plot(result["threshold"], 
-             result["Estimated revenue lift (times)"], 
-             label="Estimated revenue lift (times)", 
-             color="red")
-    ax1.legend()
-    ax2.legend()
-    plt.title("Business metrics across threshold")
-    plt.show()
-    return dict(optim_row)
-
-# Self implemented base functions to calculate model performance metrics for binary classification
-def calc_metrics(y_test, y_pred):
-    result_table = pd.DataFrame(dict(ground_truth=y_test, 
-                                     prediction=y_pred))
-    gd_pos = (result_table["ground_truth"] == 1)
-    pred_pos = (result_table["prediction"] == 1)
-    TP = result_table.loc[gd_pos & pred_pos].shape[0]
-    TN = result_table.loc[~gd_pos & ~pred_pos].shape[0]
-    FP = result_table.loc[~gd_pos & pred_pos].shape[0]
-    FN = result_table.loc[gd_pos & ~pred_pos].shape[0]
-    confusion_matrix = np.array([[TP, FP], [FN, TN]])
-    confusion_matrix = pd.DataFrame(confusion_matrix, columns=["Actual Positive", "Actual Negative"])
-    confusion_matrix.index = ["Predicted Positive", "Predicted Negative"]
-     
-    accuracy = (TP + TN) / result_table.shape[0]
-    if FN != 0:
-        recall = TP / (TP + FN)
-    else:
-        recall = np.nan
-    if FP != 0:
-        precision = TP / (TP + FP)
-    else:
-        precision = np.nan
-    f1 = 2 * precision * recall / (precision + recall)
-     
-    metrics = {"accuracy": accuracy, 
-               "recall": recall, 
-               "precision": precision, 
-               "f1": f1}
-     
-    return confusion_matrix, metrics
-
-# Get business metrics for various threshold
-def calc_business_metrics(test, y_pred, columns=["total_pymnt", "loan_amnt"]):
-    df = test.loc[:, columns]
-    df["predicted_delinquent"] = y_pred
-    pass_df = df.loc[df["predicted_delinquent"] == 0]
-    pass_rate_upperbound = round(pass_df.shape[0] / df.shape[0], 3) * 100
-    revenue_multiplier = (pass_df["total_pymnt"] - pass_df["loan_amnt"]).sum() / (df["total_pymnt"] - df["loan_amnt"]).sum()
-    profit_margin = round((pass_df["total_pymnt"] - pass_df["loan_amnt"]).sum() / pass_df["loan_amnt"].sum(), 3) * 100
-    business_metrics = {"Estimated pass rate": pass_rate_upperbound, 
-                        "Estimated revenue lift (times)": revenue_multiplier, 
-                        "Estimated profit margin": profit_margin}
-    return business_metrics
-
-# Putting everything together into a single function for model evaluation
-def evaluation_full_suite(X_train, y_train, X_test, y_test, test, model, 
-                          plot_metrics=["f1", "accuracy", "recall", "precision"]):
-    y_train_pred_proba = model.predict_proba(X_train)[:, 1]
-    y_pred_proba = model.predict_proba(X_test)[:, 1]
+    def process_data(self, data, labels):
+        if "target" in data.columns:
+            self.target = data["target"].values
+        else:
+            self.target = labels
+        if "dummy" not in data.columns:
+            data["dummy"] = np.nan
+        return data
     
-    model_name = str(model).split("(")[0]
-    plot_roc_curves(
-        legits_list=[y_train, y_test], 
-        pred_probs_list=[y_train_pred_proba, y_pred_proba], 
-        labels=["Train", "Test"],
-        title=f"ROC curves for train set and test set, {model_name} model")
-    plot_precision_recall_curves(
-        legits_list=[y_train, y_test], 
-        pred_probs_list=[y_train_pred_proba, y_pred_proba], 
-        labels=["Train", "Test"],
-        title=f"Precision Recall Curves for Train set and Test set, {model_name} model"
-    )
-    model_metrics_df = get_threshold_metrics_df(X_test, y_test, model)
-    _ = plot_threshold_metrics(model_metrics_df, metrics=plot_metrics)
-    business_metrics = plot_business_metrics(X_test, test, model)
-    optim_y_pred = (model.predict_proba(X_test)[:, 1] >= business_metrics["threshold"]).astype(int)
-    cm, model_metrics = calc_metrics(y_test, optim_y_pred)
-    plot_confusion_matrix(cm, model_metrics)
-    all_metrics = {**model_metrics, **business_metrics}
-    return all_metrics
+    def get_prediction_scores(self, data):
+        kf = StratifiedKFold(n_splits=5)
+        if self.val_indices is None:
+            self.val_indices = [idx_va for idx_tr, idx_va in kf.split(data, self.target)]
+        data["prediction"] = 0
+        for model, idx_va in tqdm(zip(self.models.values(), self.val_indices)):
+            data.loc[idx_va, "prediction"] = model.predict(
+                data.loc[idx_va, model.feature_name_], 
+                raw_score=True
+            )
+        return data
+    
+    def get_validation_performance(self, data):
+        data = data.sort_values(by="prediction", ascending=False)
+        data['weight'] = data['target'].apply(lambda x: 20 if x==0 else 1)
+        four_pct_cutoff = int(0.04 * data['weight'].sum())
+        data['weight_cumsum'] = data['weight'].cumsum()
+        data["is_cutoff"] = 0
+        data.loc[data['weight_cumsum'] <= four_pct_cutoff, "is_cutoff"] = 1
+        data = data.reset_index()
+        all_pos = np.sum(self.target)
+        top4_pos = data.loc[(data["target"] == 1) & (data["is_cutoff"] == 1)].shape[0]
+        d = top4_pos / all_pos
+        
+        data['random'] = (data['weight'] / data['weight'].sum()).cumsum()
+        total_pos = (data['target'] * data['weight']).sum()
+        data['cum_pos_found'] = (data['target'] * data['weight']).cumsum()
+        data['lorentz'] = data['cum_pos_found'] / total_pos
+        data['gini'] = (data['lorentz'] - data['random']) * data['weight']
+        gini = data["gini"].sum()
+        n_pos = np.sum(self.target)
+        n_neg = self.target.shape[0] - n_pos
+        gini_max = 10 * n_neg * (n_pos + 20 * n_neg - 19) / (n_pos + 20 * n_neg)
+        g = gini / gini_max
+        
+        self.val_metrics = [0.5 * (g + d), g, d]
+        return data
+    
+    def get_test_prediction(self, test_data):
+        test_data = self.process_data(test_data)
+        scores_list = []
+        for model in tqdm(self.models.values()):
+            scores_list.append(model.predict_proba(
+                test_data.loc[:, model.feature_name_], 
+                raw_score=True
+            ))
+        test_data["prediction"] = np.mean(scores_list, axis=0)
+        del scores_list
+        return test_data
+    
+    @staticmethod
+    def get_agg_type(df):
+        if "feature" in df.columns:
+            return df["feature"].str.split("_").str[2:].str.join("_").values
+        else:
+            return df.index.str.split("_").str[2:].str.join("_").values
+    
+    @staticmethod
+    def get_base_feature_column(df):
+        if "feature" in df.columns:
+            return df["feature"].str.split("_").str[:2].str.join("_").values
+        else:
+            return df.index.str.split("_").str[:2].str.join("_").values
+    
+    def get_feature_importance_summary(self):
+        feature_imps = []
+        for i, model in self.models.items():
+            feature_imps.append(
+                pd.DataFrame(
+                    {
+                        "feature": self.feature_names[i], 
+                        f"importance{i}": self.feature_importances[i]
+                    }
+                ).set_index("feature")
+            )
+        feature_imp_df = pd.concat(feature_imps, axis=1)
+        feature_imp_df["average_importance"] = feature_imp_df.mean(axis=1)
+        feature_imp_df = feature_imp_df.reset_index()
+        feature_imp_df = feature_imp_df.sort_values("average_importance", ascending=False)
+        
+        feature_imp_df["agg_type"] = self.get_agg_type(feature_imp_df)
+        feature_imp_df["base_feature"] = self.get_base_feature_column(feature_imp_df)
+        self.feature_imp_df = feature_imp_df.copy()
+        del feature_imp_df
+        
+        pivoted_feature_imp_df = pd.pivot_table(
+            self.feature_imp_df, 
+            values="average_importance", 
+            index="base_feature", 
+            columns="agg_type"
+        ).drop(columns="", errors="ignore").reset_index()
+        
+        self.feature_imp_summary = pivoted_feature_imp_df.loc[
+            (pivoted_feature_imp_df["base_feature"].str.contains("_")) & 
+            (pivoted_feature_imp_df["base_feature"].str.len() < 10)
+        ]
+    
+    def inference_full(self, data, batch_size=5000):
+        scores_list = []
+        for j, model in enumerate(self.models.values()):
+            score_list = []
+            print(f"Model {j + 1}")
+            for i in tqdm(range(int(data.shape[0] / batch_size) + 1)):
+                score_list.append(model.predict(
+                    data.loc[int(i*batch_size): int((i+1)*batch_size) - 1, model.feature_name()], 
+                    raw_score=True
+                ))
+            scores_list.append(np.concatenate(score_list))
+        score_df = pd.DataFrame(np.stack(scores_list).T, columns=[f"score{i}" for i in range(1, 6)])
+        data["prediction"] = score_df.mean(axis=1)
+        return data
+    
+    def inference_fold(self, data, target, batch_size=5000, shuffle_random_state=False):
+        scores_list = []
+        if shuffle_random_state:
+            kf = StratifiedKFold(n_splits=5, shuffle=True, random_state=shuffle_random_state)
+        else:
+            kf = StratifiedKFold(n_splits=5)
+        for model, (idx_tr, idx_va) in zip(self.models.values(), kf.split(data, target)):
+            data.loc[idx_va, "prediction"] = model.predict(
+                data.loc[idx_va, model.feature_name()],
+                raw_score=True
+            )
+        return data
+    
+    def run_validation_check(self, data, labels):
+        data = self.process_data(data)
+        data = self.get_prediction_scores(data, labels)
+        data = self.get_validation_performance(data)
+        return data

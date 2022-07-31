@@ -140,11 +140,45 @@ def get_agg_df(df):
     return all_df
 
 def get_ma_df(df):
-    # Calculate aggregate features
-    # cid = pd.Categorical(df['customer_ID'], ordered=True)
     cid = 'customer_ID'
     numeric_columns = list(set(df.columns) - set(CATEGORY_COLUMNS) - set(NON_FEATURE_COLUMNS))
     all_columns = list(set(numeric_columns).union(set(CATEGORY_COLUMNS)))
+    
+    ma2_r1 = (df
+      .loc[df["row_number"].between(1, 2)]
+      .groupby(cid)[numeric_columns]
+      .mean()
+      .rename(columns={f: f"{f}_ma2_r1" for f in numeric_columns})
+    )
+    print("MA2 for Recency 1 done")
+    gc.collect()
+    
+    ma2_r2 = (df
+      .loc[df["row_number"].between(3, 4)]
+      .groupby(cid)[numeric_columns]
+      .mean()
+      .rename(columns={f: f"{f}_ma2_r2" for f in numeric_columns})
+    )
+    print("MA2 for Recency 2 done")
+    gc.collect()
+    
+    ma2_r3 = (df
+      .loc[df["row_number"].between(5, 6)]
+      .groupby(cid)[numeric_columns]
+      .mean()
+      .rename(columns={f: f"{f}_ma2_r3" for f in numeric_columns})
+    )
+    print("MA2 for Recency 3 done")
+    gc.collect()
+    
+    ma2_first = (df
+      .loc[df["row_number_inv"].between(1, 2)]
+      .groupby(cid)[numeric_columns]
+      .mean()
+      .rename(columns={f: f"{f}_ma2_first" for f in numeric_columns})
+    )
+    print("MA2 for least Recency done")
+    gc.collect()
     
     ma3_r1 = (df
       .loc[df["row_number"].between(1, 3)]
@@ -164,39 +198,23 @@ def get_ma_df(df):
     print("MA3 for Recency 2 done")
     gc.collect()
     
-    ma3_r3 = (df
-      .loc[df["row_number_inv"].between(4, 6)]
-      .groupby(cid)[numeric_columns]
-      .mean()
-      .rename(columns={f: f"{f}_ma3_r3" for f in numeric_columns})
-    )
-    print("MA3 for Recency 3 done")
-    gc.collect()
-    
-    ma3_r4 = (df
-      .loc[df["row_number_inv"].between(1, 3)]
-      .groupby(cid)[numeric_columns]
-      .mean()
-      .rename(columns={f: f"{f}_ma3_r4" for f in numeric_columns})
-    )
-    print("MA3 for Recency 4 done")
-    gc.collect()
-    
     all_df = pd.concat(
         [
+            ma2_r1,
+            ma2_r2,
+            ma2_r3,
+            ma2_first,
             ma3_r1, 
             ma3_r2, 
-            ma3_r3, 
-            ma3_r4
         ], 
         axis=1
     )
     
-    del df, ma3_r1, ma3_r2, ma3_r3, ma3_r4
+    del df, ma2_r1, ma2_r2, ma2_r3, ma2_first, ma3_r1, ma3_r2
     return all_df
 
 def integerize(series, dtype_size=np.int16):
-    return series.fillna(-1).astype(dtype_size)
+    return series.fillna(-127).astype(dtype_size)
 
 def feature_gen_pipeline(df):
     agg = get_agg_df(df)
@@ -216,6 +234,7 @@ def feature_gen_pipeline(df):
     for col in tqdm(numeric_columns):
         agg[f"{col}_range"] = agg[f"{col}_max"] - agg[f"{col}_min"]
         agg[f"{col}_displacement"] = agg[f"{col}_last"] - agg[f"{col}_first"]
+        agg[f"{col}_last_first_ratio"] = agg[f"{col}_last"] / agg[f"{col}_first"]
         agg[f"{col}_velocity"] = agg[f"{col}_displacement"] / agg["num_statements"]
         agg[f"{col}_sprint"] = agg[f"{col}_last"] - agg[f"{col}_second_last"]
         agg[f"{col}_previous_sprint"] = agg[f"{col}_second_last"] - agg[f"{col}_third_last"]
@@ -225,12 +244,13 @@ def feature_gen_pipeline(df):
         agg[f"{col}_last_minus_avg"] = agg[f"{col}_last"] - agg[f"{col}_avg"]
         agg[f"{col}_coef_var"] = (agg[f"{col}_std"] / agg[f"{col}_avg"]).replace([np.inf, -np.inf], np.nan)
         agg[f"{col}_ma3_r1_r2"] = agg[f"{col}_ma3_r1"] / agg[f"{col}_ma3_r2"]
-        agg[f"{col}_ma3_r1_r3"] = agg[f"{col}_ma3_r1"] / agg[f"{col}_ma3_r3"]
-        agg[f"{col}_ma3_r1_r4"] = agg[f"{col}_ma3_r1"] / agg[f"{col}_ma3_r4"]
-        agg[f"{col}_general_trend"] = 100 * (agg[f"{col}_ma3_r1"] - agg[f"{col}_ma3_r4"]) / agg["num_statements"]
+        agg[f"{col}_ma2_r1_r2"] = agg[f"{col}_ma2_r1"] / agg[f"{col}_ma2_r2"]
+        agg[f"{col}_ma2_r1_r3"] = agg[f"{col}_ma2_r1"] / agg[f"{col}_ma2_r3"]
+        agg[f"{col}_general_trend"] = 100 * (agg[f"{col}_ma2_r1"] - agg[f"{col}_ma2_first"]) / agg["num_statements"]
         gc.collect()
-        
-    agg = agg.drop(columns=["num_statements"], errors="ignore")
-    if "customer_ID" not in agg.columns:
-        agg = agg.reset_index().rename(columns={"index": "customer_ID"})
+    
+    if "num_statements" in agg.columns:
+        agg = agg.drop(columns=["num_statements"])
+    # if "customer_ID" not in agg.columns:
+    #     agg = agg.reset_index().rename(columns={"index": "customer_ID"})
     return agg

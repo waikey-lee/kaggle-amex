@@ -158,7 +158,7 @@ def plot_int_feature_distribution(train, test, col):
     plt.show()
     
 def plot_train_test_distribution(train, test, col, figsize=(18, 8), q=100, 
-                                 nunique_thr=100):
+                                 nunique_thr=100, return_df=False):
     fig, ax = plt.subplots(figsize=figsize)
     if train[col].nunique() >= nunique_thr:
         train[col].plot.kde(color='yellow')
@@ -188,6 +188,8 @@ def plot_train_test_distribution(train, test, col, figsize=(18, 8), q=100,
         plt.legend()
     fig.autofmt_xdate(rotation=45)
     plt.show()
+    if return_df:
+        return proportion_count_df
     
 def check_overlap_missing(df, col1, col2, n1=np.nan, n2=np.nan):
     col1_null_indices = df.loc[df[col1] == n1].index
