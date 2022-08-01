@@ -1,12 +1,17 @@
+import catboost
 import joblib
 import json
+import lightgbm as lgb
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 import pandas as pd
 import seaborn as sns
+from sklearn.model_selection import train_test_split, StratifiedKFold
 from sklearn.metrics import roc_curve, roc_auc_score, precision_recall_curve, average_precision_score
+from tqdm import tqdm
 
+# Function to calculate overall amex metric, Gini, and 4% Positive capture rate
 def amex_metric(y_true: np.array, y_pred: np.array) -> float:
     # count of positives and negatives
     n_pos = y_true.sum()
@@ -36,13 +41,13 @@ def amex_metric(y_true: np.array, y_pred: np.array) -> float:
 
     return 0.5 * (g + d), g, d
 
+# Function to be use in LGBM in-train validation
 def lgb_amex_metric(y_pred, train_data):
     """The competition metric with lightgbm's calling convention"""
     y_true = train_data.get_label()
     return ('amex',
             amex_metric(y_true, y_pred)[0],
             True)
-
 
 # Plot ROC AUC curves for both train and test
 def plot_roc_curves(legits_list, pred_probs_list, labels=["Train", "Test"], title=None):
@@ -68,14 +73,6 @@ def plot_precision_recall_curves(legits_list, pred_probs_list, labels=["Train", 
     ax.set_xlabel('Recall')
     ax.legend()
     plt.show()
-
-# Get the model evaluation metrics for training and test 
-def get_performance_metrics(legits_list, preds_list, labels, metrics, functions):
-    result_dict = dict()
-    for legits, preds, label in zip(legits_list, preds_list, labels):
-        result_dict[label] = [func(legits, preds) for func in functions]
-    performance_df = pd.DataFrame(result_dict, index=metrics)
-    return performance_df
 
 # Plot feature importances
 def plot_feature_importance(features, importances, title=None, limit=100, figsize=(15, 8), ascending=False):
@@ -159,11 +156,11 @@ def get_final_metric_df(X: pd.DataFrame, y_true: pd.DataFrame, y_pred: pd.DataFr
 
 #     return 0.5 * (g + d), g, d
 
-class LGBM:
-    def __init__(self, exp_full_path, val_indices=None):
+class TreeExperiment:
+    def __init__(self, exp_full_path, seed=None):
         self.path = exp_full_path
         self.target = []
-        self.val_indices = val_indices
+        self.seed = seed
         self.models = {}
         self.feature_names = {}
         self.feature_importances = {}
@@ -172,84 +169,102 @@ class LGBM:
         self.feature_imp_df = pd.DataFrame()
         self.feature_imp_summary = pd.DataFrame()
         self.read_models()
+        self.retrieve_features()
         self.get_master_feature_set()
         self.get_feature_importance_summary()
     
+    # To read all (usually 5) models from the experiment's directory
     def read_models(self):
         model_paths = [file for file in sorted(os.listdir(f"{self.path}/models")) if file.startswith("model")]
         for i, model_path in enumerate(model_paths):
             self.models[i] = joblib.load(f"{self.path}/models/{model_path}")
-            try:
+    
+    # To retrieve the list of feature names, as well as their respective feature importances
+    # Currently support only CatBoost Classifier & LGBM Booster
+    def retrieve_features(self):
+        for i, model in self.models.items():
+            if type(model) == catboost.core.CatBoostClassifier:
+                feature_name = self.models[i].feature_names_
+                feature_imp = self.models[i].feature_importances_
+            elif type(model) == lgb.basic.Booster:
                 feature_name = self.models[i].feature_name()
                 feature_imp = self.models[i].feature_importance()
-            except:
+            else:
                 feature_name = self.models[i].feature_name_
                 feature_imp = self.models[i].feature_importances_
             self.feature_names[i] = feature_name
             self.feature_importances[i] = feature_imp
     
+    # Get the list of (union of) full feature list specfically for this experiment
     def get_master_feature_set(self):
         for feature_names in self.feature_names.values():
             self.master_feature_set = self.master_feature_set.union(feature_names)
     
-    def process_data(self, data, labels):
-        if "target" in data.columns:
-            self.target = data["target"].values
+    # Inference on training data, return full input + additional column of prediction score
+    def inference_on_train(self, train):
+        # Use the same seed during training to ensure inference only on held-out dataset
+        if self.seed is not None:
+            kf = StratifiedKFold(n_splits=5, seed=self.seed, shuffle=True)
         else:
-            self.target = labels
-        if "dummy" not in data.columns:
-            data["dummy"] = np.nan
-        return data
-    
-    def get_prediction_scores(self, data):
-        kf = StratifiedKFold(n_splits=5)
-        if self.val_indices is None:
-            self.val_indices = [idx_va for idx_tr, idx_va in kf.split(data, self.target)]
-        data["prediction"] = 0
-        for model, idx_va in tqdm(zip(self.models.values(), self.val_indices)):
-            data.loc[idx_va, "prediction"] = model.predict(
-                data.loc[idx_va, model.feature_name_], 
+            kf = StratifiedKFold(n_splits=5)
+        target = train["target"].values
+        val_indices = [idx_va for idx_tr, idx_va in kf.split(train, target)]
+        train["prediction"] = 0
+        for model, idx_va, feature_list in tqdm(zip(self.models.values(), val_indices, self.feature_names.values())):
+            train.loc[idx_va, "prediction"] = model.predict(
+                train.loc[idx_va, feature_list], 
                 raw_score=True
             )
-        return data
+        return train
     
-    def get_validation_performance(self, data):
-        data = data.sort_values(by="prediction", ascending=False)
-        data['weight'] = data['target'].apply(lambda x: 20 if x==0 else 1)
-        four_pct_cutoff = int(0.04 * data['weight'].sum())
-        data['weight_cumsum'] = data['weight'].cumsum()
-        data["is_cutoff"] = 0
-        data.loc[data['weight_cumsum'] <= four_pct_cutoff, "is_cutoff"] = 1
-        data = data.reset_index()
-        all_pos = np.sum(self.target)
-        top4_pos = data.loc[(data["target"] == 1) & (data["is_cutoff"] == 1)].shape[0]
+    # Calculate Amex metric based on the train data with prediction score column
+    def calc_validation_performance(self, train, target_col="target", prediction_col="prediction"):
+        # General Preparation
+        target = train[target_col].values
+        all_pos = np.sum(target)
+        train = train.sort_values(by=prediction_col, ascending=False)
+        train['weight'] = train[target_col].apply(lambda x: 20 if x==0 else 1)
+        
+        # Calculate top 4 percent default capture rate
+        four_pct_cutoff = int(0.04 * train['weight'].sum())
+        train['weight_cumsum'] = train['weight'].cumsum()
+        train["is_cutoff"] = 0
+        train.loc[train['weight_cumsum'] <= four_pct_cutoff, "is_cutoff"] = 1
+        train = train.reset_index()
+        top4_pos = train.loc[(train[target_col] == 1) & (train["is_cutoff"] == 1)].shape[0]
         d = top4_pos / all_pos
         
-        data['random'] = (data['weight'] / data['weight'].sum()).cumsum()
-        total_pos = (data['target'] * data['weight']).sum()
-        data['cum_pos_found'] = (data['target'] * data['weight']).cumsum()
-        data['lorentz'] = data['cum_pos_found'] / total_pos
-        data['gini'] = (data['lorentz'] - data['random']) * data['weight']
-        gini = data["gini"].sum()
-        n_pos = np.sum(self.target)
-        n_neg = self.target.shape[0] - n_pos
-        gini_max = 10 * n_neg * (n_pos + 20 * n_neg - 19) / (n_pos + 20 * n_neg)
+        # Calculate Gini
+        train['random'] = (train['weight'] / train['weight'].sum()).cumsum()
+        total_pos = (train[target_col] * train['weight']).sum()
+        train['cum_pos_found'] = (train[target_col] * train['weight']).cumsum()
+        train['lorentz'] = train['cum_pos_found'] / total_pos
+        train['gini'] = (train['lorentz'] - train['random']) * train['weight']
+        gini = train["gini"].sum()
+        all_neg = target.shape[0] - all_pos
+        gini_max = 10 * all_neg * (all_pos + 20 * all_neg - 19) / (all_pos + 20 * all_neg)
         g = gini / gini_max
         
-        self.val_metrics = [0.5 * (g + d), g, d]
-        return data
+        return train, (0.5 * (g + d), g, d)
     
-    def get_test_prediction(self, test_data):
-        test_data = self.process_data(test_data)
+    # Run both inference on train & calculate validation performance
+    def get_validation_performance(self, train):
+        train = self.inference_on_train(train)
+        return self.calc_validation_performance(train)
+    
+    # Inference on whole dataset, by batch
+    def inference_full(self, data, batch_size=5000):
         scores_list = []
-        for model in tqdm(self.models.values()):
-            scores_list.append(model.predict_proba(
-                test_data.loc[:, model.feature_name_], 
-                raw_score=True
-            ))
-        test_data["prediction"] = np.mean(scores_list, axis=0)
-        del scores_list
-        return test_data
+        for model, feature_list in tqdm(zip(self.models.values(), self.feature_names.values())):
+            score_list = []
+            for i in range(int(data.shape[0] / batch_size) + 1):
+                score_list.append(model.predict(
+                    data.loc[int(i * batch_size): int((i+1) * batch_size) - 1, feature_list], 
+                    raw_score=True
+                ))
+            scores_list.append(np.concatenate(score_list))
+        score_df = pd.DataFrame(np.stack(scores_list).T, columns=[f"score{i}" for i in range(1, 6)])
+        return score_df
     
     @staticmethod
     def get_agg_type(df):
@@ -297,37 +312,3 @@ class LGBM:
             (pivoted_feature_imp_df["base_feature"].str.contains("_")) & 
             (pivoted_feature_imp_df["base_feature"].str.len() < 10)
         ]
-    
-    def inference_full(self, data, batch_size=5000):
-        scores_list = []
-        for j, model in enumerate(self.models.values()):
-            score_list = []
-            print(f"Model {j + 1}")
-            for i in tqdm(range(int(data.shape[0] / batch_size) + 1)):
-                score_list.append(model.predict(
-                    data.loc[int(i*batch_size): int((i+1)*batch_size) - 1, model.feature_name()], 
-                    raw_score=True
-                ))
-            scores_list.append(np.concatenate(score_list))
-        score_df = pd.DataFrame(np.stack(scores_list).T, columns=[f"score{i}" for i in range(1, 6)])
-        data["prediction"] = score_df.mean(axis=1)
-        return data
-    
-    def inference_fold(self, data, target, batch_size=5000, shuffle_random_state=False):
-        scores_list = []
-        if shuffle_random_state:
-            kf = StratifiedKFold(n_splits=5, shuffle=True, random_state=shuffle_random_state)
-        else:
-            kf = StratifiedKFold(n_splits=5)
-        for model, (idx_tr, idx_va) in zip(self.models.values(), kf.split(data, target)):
-            data.loc[idx_va, "prediction"] = model.predict(
-                data.loc[idx_va, model.feature_name()],
-                raw_score=True
-            )
-        return data
-    
-    def run_validation_check(self, data, labels):
-        data = self.process_data(data)
-        data = self.get_prediction_scores(data, labels)
-        data = self.get_validation_performance(data)
-        return data
