@@ -204,18 +204,24 @@ class TreeExperiment:
     def inference_on_train(self, train):
         # Use the same seed during training to ensure inference only on held-out dataset
         if self.seed is not None:
-            kf = StratifiedKFold(n_splits=5, seed=self.seed, shuffle=True)
+            kf = StratifiedKFold(n_splits=5, random_state=self.seed, shuffle=True)
         else:
             kf = StratifiedKFold(n_splits=5)
         target = train["target"].values
         val_indices = [idx_va for idx_tr, idx_va in kf.split(train, target)]
+        val_auc_list = []
         train["prediction"] = 0
         for model, idx_va, feature_list in tqdm(zip(self.models.values(), val_indices, self.feature_names.values())):
-            train.loc[idx_va, "prediction"] = model.predict(
+            temp = model.predict(
                 train.loc[idx_va, feature_list], 
                 raw_score=True
             )
-        return train
+            val_auc_list.append(roc_auc_score(
+                train.loc[idx_va, "target"].values, 
+                temp
+            ))
+            train.loc[idx_va, "prediction"] = temp
+        return train, val_auc_list
     
     # Calculate Amex metric based on the train data with prediction score column
     def calc_validation_performance(self, train, target_col="target", prediction_col="prediction"):
@@ -230,7 +236,7 @@ class TreeExperiment:
         train['weight_cumsum'] = train['weight'].cumsum()
         train["is_cutoff"] = 0
         train.loc[train['weight_cumsum'] <= four_pct_cutoff, "is_cutoff"] = 1
-        train = train.reset_index()
+        # train = train.reset_index()
         top4_pos = train.loc[(train[target_col] == 1) & (train["is_cutoff"] == 1)].shape[0]
         d = top4_pos / all_pos
         
@@ -249,15 +255,19 @@ class TreeExperiment:
     
     # Run both inference on train & calculate validation performance
     def get_validation_performance(self, train):
-        train = self.inference_on_train(train)
-        return self.calc_validation_performance(train)
+        train, val_auc_list = self.inference_on_train(train)
+        train, final_metrics = self.calc_validation_performance(train)
+        return train, final_metrics, val_auc_list
     
     # Inference on whole dataset, by batch
     def inference_full(self, data, batch_size=5000):
         scores_list = []
-        for model, feature_list in tqdm(zip(self.models.values(), self.feature_names.values())):
+        j = 0
+        for model, feature_list in zip(self.models.values(), self.feature_names.values()):
             score_list = []
-            for i in range(int(data.shape[0] / batch_size) + 1):
+            j += 1
+            print(f"Model {j}")
+            for i in tqdm(range(int(data.shape[0] / batch_size) + 1)):
                 score_list.append(model.predict(
                     data.loc[int(i * batch_size): int((i+1) * batch_size) - 1, feature_list], 
                     raw_score=True

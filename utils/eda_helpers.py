@@ -69,7 +69,8 @@ def plot_missing_proportion_barchart(df, top_n=30, **kwargs):
 
 # Check missing value x target distribution
 def plot_target_check(df, column, q=20, return_df=False, figsize=(18, 8), 
-                      use_raw_bin=False, strfy_x=False, nunique_thr=100, drop_outlier=False):
+                      use_raw_bin=False, strfy_x=False, nunique_thr=100, 
+                      drop_outlier=False, without_drop_tail=False):
     null_proportion = df.loc[df[column].isnull()]
     print(f"{null_proportion.shape[0]} null count, {null_proportion.shape[0] / df.shape[0]:.3f} null proportion")
     print(f"{null_proportion['target'].mean():.4f} of the targets have label = 1")
@@ -93,7 +94,13 @@ def plot_target_check(df, column, q=20, return_df=False, figsize=(18, 8),
     summary = summary.rename(columns={"index": column})
     if df[column].nunique() < nunique_thr and nunique_thr >= 100:
         print("Bottom 1% and Top 1% are dropped from this chart")
-        summary = summary.loc[summary[column].between(np.percentile(df[column].dropna(), 1), np.percentile(df[column].dropna(), 99))]
+        if without_drop_tail:
+            min_ = -np.inf
+            max_ = np.inf
+        else:
+            min_ = np.percentile(df[column].dropna(), 1)
+            max_ = np.percentile(df[column].dropna(), 99)
+        summary = summary.loc[summary[column].between(min_, max_)]
     
     if df[column].nunique() >= nunique_thr and use_raw_bin:
         adjusted_x_series = summary[column].apply(lambda x: pd.Interval(left=round(x.left, 4), right=round(x.right, 4))).astype(str)
@@ -158,7 +165,7 @@ def plot_int_feature_distribution(train, test, col):
     plt.show()
     
 def plot_train_test_distribution(train, test, col, figsize=(18, 8), q=100, 
-                                 nunique_thr=100, return_df=False):
+                                 nunique_thr=100, return_df=False, without_drop_tail=False):
     fig, ax = plt.subplots(figsize=figsize)
     if train[col].nunique() >= nunique_thr:
         train[col].plot.kde(color='yellow')
@@ -176,7 +183,13 @@ def plot_train_test_distribution(train, test, col, figsize=(18, 8), q=100,
         
         if train[col].nunique() < nunique_thr and nunique_thr >= 100:
             print("Bottom 1% and Top 1% are dropped from this chart")
-            proportion_count_df = proportion_count_df.loc[proportion_count_df[col].between(np.percentile(train[col].dropna(), 1), np.percentile(train[col].dropna(), 99))]
+            if without_drop_tail:
+                min_ = -np.inf
+                max_ = np.inf
+            else:
+                min_ = np.percentile(train[col].dropna(), 1)
+                max_ = np.percentile(train[col].dropna(), 99)
+            proportion_count_df = proportion_count_df.loc[proportion_count_df[col].between(min_, max_)]
         
         X_axis = np.arange(proportion_count_df.shape[0])
         plt.bar(X_axis - 0.2, proportion_count_df["train_count"], 0.4, label='Train', alpha=0.8)

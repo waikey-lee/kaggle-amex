@@ -22,6 +22,8 @@ def read_file(path='', usecols=None, sort=False, replace_negative_one=False, rep
             df = df.loc[:, usecols]
     else:
         print("Unknown file format")
+    if "S_2" in df.columns:
+        df["S_2"] = pd.to_datetime(df["S_2"])
     if "customer_ID" not in df.columns and df.shape[0] in [5531451, 458913]:
         df = df.reset_index().rename(columns={"index": 'customer_ID'})
     if sort:

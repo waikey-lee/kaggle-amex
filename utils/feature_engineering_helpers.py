@@ -213,9 +213,6 @@ def get_ma_df(df):
     del df, ma2_r1, ma2_r2, ma2_r3, ma2_first, ma3_r1, ma3_r2
     return all_df
 
-def integerize(series, dtype_size=np.int16):
-    return series.fillna(-127).astype(dtype_size)
-
 def feature_gen_pipeline(df):
     agg = get_agg_df(df)
     agg["num_statements"] = (
