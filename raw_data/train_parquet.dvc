@@ -1,5 +1,0 @@
-outs:
-- md5: b2af3fb2a1d5a411d6d66e2ceb18e258.dir
-  size: 1638220398
-  nfiles: 2
-  path: train_parquet
