@@ -164,36 +164,44 @@ def plot_int_feature_distribution(train, test, col):
 
     plt.show()
     
-def plot_train_test_distribution(train, test, col, figsize=(18, 8), q=100, 
+def plot_train_test_distribution(df_list, col, figsize=(18, 8), q=100, 
                                  nunique_thr=100, return_df=False, without_drop_tail=False):
-    fig, ax = plt.subplots(figsize=figsize)
-    if train[col].nunique() >= nunique_thr:
-        train[col].plot.kde(color='yellow')
-        test[col].plot.kde(color='green')
+    if len(df_list) == 3:
+        color_list = ["yellow", "orange", "green"]
+        name_list = ["Train", "PublicTest", "PrivateTest"]
     else:
-        train["temp"] = train[col]
-        test["temp"] = test[col]
-        train_series = train["temp"].value_counts(normalize=True).reset_index().rename(columns={"temp": "train_count"})
-        test_series = test["temp"].value_counts(normalize=True).reset_index().rename(columns={"temp": "test_count"})
-        proportion_count_df = train_series.merge(
-            test_series,
-            on="index",
-            how="outer"
-        ).rename(columns={"index": col}).sort_values(by=col).reset_index(drop=True)
+        color_list = ["yellow", "green"]
+        name_list = ["Train", "PrivateTest"]
+    fig, ax = plt.subplots(figsize=figsize)
+    if df_list[0][col].nunique() >= nunique_thr:
+        for df, color in zip(df_list, color_list):
+            df[col].plot.kde(color=color)
+    else:
+        many_series = []
+        for df, name in zip(df_list, name_list):
+            df["temp"] = df[col].copy()
+            count_series = df["temp"].value_counts(normalize=True).rename(name)
+            many_series.append(count_series)
+        proportion_count_df = pd.concat(many_series, axis=1).sort_index().reset_index().rename(columns={"index": col})
         
-        if train[col].nunique() < nunique_thr and nunique_thr >= 100:
+        if df_list[0][col].nunique() < nunique_thr and nunique_thr >= 100:
             print("Bottom 1% and Top 1% are dropped from this chart")
             if without_drop_tail:
                 min_ = -np.inf
                 max_ = np.inf
             else:
-                min_ = np.percentile(train[col].dropna(), 1)
-                max_ = np.percentile(train[col].dropna(), 99)
+                min_ = np.percentile(df_list[0][col].dropna(), 1)
+                max_ = np.percentile(df_list[0][col].dropna(), 99)
             proportion_count_df = proportion_count_df.loc[proportion_count_df[col].between(min_, max_)]
         
         X_axis = np.arange(proportion_count_df.shape[0])
-        plt.bar(X_axis - 0.2, proportion_count_df["train_count"], 0.4, label='Train', alpha=0.8)
-        plt.bar(X_axis + 0.2, proportion_count_df["test_count"], 0.4, label='Test', alpha=0.8)
+        if len(df_list) == 2:
+            plt.bar(X_axis - 0.2, proportion_count_df[name_list[0]], 0.4, label=name_list[0], alpha=0.8, color=color_list[0])
+            plt.bar(X_axis + 0.2, proportion_count_df[name_list[1]], 0.4, label=name_list[1], alpha=0.8, color=color_list[1])
+        elif len(df_list) == 3:
+            plt.bar(X_axis - 0.275, proportion_count_df[name_list[0]], 0.275, label=name_list[0], alpha=0.8, color=color_list[0])
+            plt.bar(X_axis, proportion_count_df[name_list[1]], 0.275, label=name_list[1], alpha=0.8, color=color_list[1])
+            plt.bar(X_axis + 0.275, proportion_count_df[name_list[2]], 0.275, label=name_list[2], alpha=0.8, color=color_list[2])
         plt.xticks(X_axis, proportion_count_df[col].round(2))
         plt.xlabel(col)
         plt.ylabel("Proportion of records")
