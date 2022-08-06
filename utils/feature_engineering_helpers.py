@@ -214,6 +214,8 @@ def get_ma_df(df):
     return all_df
 
 def feature_gen_pipeline(df):
+    cat_columns = set(CATEGORY_COLUMNS).intersection(set(df.columns))
+    df.loc[:, cat_columns] = df.loc[:, cat_columns].astype("category")
     agg = get_agg_df(df)
     agg["num_statements"] = (
         df.loc[df["row_number"] == 1][["row_number", "row_number_inv"]].sum(axis=1) - 1
