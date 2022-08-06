@@ -25,8 +25,11 @@ def round_decimals_down(number:float, decimals:int=2):
     elif decimals < 0:
         raise ValueError("decimal places has to be 0 or more")
     elif decimals == 0:
-        return math.floor(number)
-
+        try:
+            return math.floor(number)
+        except:
+            return number
+        
     factor = 10 ** decimals
     try:
         return math.floor(number * factor) / factor
