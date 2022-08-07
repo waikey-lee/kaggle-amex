@@ -79,17 +79,12 @@ def plot_feature_importance(features, importances, title=None, limit=100, figsiz
     imp_df = pd.DataFrame(dict(feature=features, feature_importance=importances))
     imp_df = imp_df.sort_values(by="feature_importance", ascending=ascending).reset_index(drop=True)
     fig, ax = plt.subplots(figsize=figsize)
-<<<<<<< Updated upstream
-    sns.barplot(x=imp_df.iloc[:limit]["feature_importance"], 
-                y=imp_df.iloc[:limit]["feature"], 
-=======
     if limit:
         imp_plot = imp_df.iloc[:limit]
     else:
         imp_plot = imp_df
     sns.barplot(x=imp_plot["feature_importance"], 
                 y=imp_plot["feature"], 
->>>>>>> Stashed changes
                 ax=ax)
     if title is not None:
         plt.title(title)
@@ -119,9 +114,7 @@ def amex_metric_np(preds: np.ndarray, target: np.ndarray) -> float:
 
 # Get evaluation df
 def get_final_metric_df(X: pd.DataFrame, y_true: pd.DataFrame, y_pred: pd.DataFrame):
-    df = (pd.concat([X, y_true, y_pred], axis='columns')
-<<<<<<< Updated upstream
-          .sort_values('prediction', ascending=False))
+    df = (pd.concat([X, y_true, y_pred], axis='columns').sort_values('prediction', ascending=False))
     df['weight'] = df['target'].apply(lambda x: 20 if x==0 else 1)
     four_pct_cutoff = int(0.04 * df['weight'].sum())
     df['weight_cumsum'] = df['weight'].cumsum()
@@ -133,25 +126,6 @@ def get_final_metric_df(X: pd.DataFrame, y_true: pd.DataFrame, y_pred: pd.DataFr
     df['lorentz'] = df['cum_pos_found'] / total_pos
     df['gini'] = (df['lorentz'] - df['random']) * df['weight']
     return df
-=======
-          .sort_values(y_pred.name, ascending=False))
-    top_four_percent_df = df.copy()
-    top_four_percent_df['weight'] = top_four_percent_df['target'].apply(lambda x: 20 if x==0 else 1)
-    four_pct_cutoff = int(0.04 * top_four_percent_df['weight'].sum())
-    top_four_percent_df['weight_cumsum'] = top_four_percent_df['weight'].cumsum()
-    top_four_percent_df["is_cutoff"] = 0
-    top_four_percent_df.loc[top_four_percent_df['weight_cumsum'] <= four_pct_cutoff, "is_cutoff"] = 1
-    
-    gini_df = df.copy()
-    gini_df['weight'] = gini_df['target'].apply(lambda x: 20 if x==0 else 1)
-    gini_df['random'] = (gini_df['weight'] / gini_df['weight'].sum()).cumsum()
-    total_pos = (gini_df['target'] * gini_df['weight']).sum()
-    gini_df['cum_pos_found'] = (gini_df['target'] * gini_df['weight']).cumsum()
-    gini_df['lorentz'] = gini_df['cum_pos_found'] / total_pos
-    gini_df['gini'] = (gini_df['lorentz'] - gini_df['random']) * gini_df['weight']
-    
-    return top_four_percent_df, gini_df
->>>>>>> Stashed changes
     
 def calc_amex_metric_from_df(df, ground_truth="target", prediction="raw_score"):
     # Prepare requirement

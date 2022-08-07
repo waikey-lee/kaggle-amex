@@ -93,11 +93,11 @@ def plot_target_check(df, column, q=20, return_df=False, figsize=(18, 8),
     ).reset_index()
     summary = summary.rename(columns={"index": column})
     if df[column].nunique() < nunique_thr and nunique_thr >= 100:
-        print("Bottom 1% and Top 1% are dropped from this chart")
         if without_drop_tail:
             min_ = -np.inf
             max_ = np.inf
         else:
+            print("Bottom 1% and Top 1% are dropped from this chart")
             min_ = np.percentile(df[column].dropna(), 1)
             max_ = np.percentile(df[column].dropna(), 99)
         summary = summary.loc[summary[column].between(min_, max_)]
@@ -185,11 +185,11 @@ def plot_train_test_distribution(df_list, col, figsize=(18, 8), q=100,
         proportion_count_df = pd.concat(many_series, axis=1).sort_index().reset_index().rename(columns={"index": col})
         
         if df_list[0][col].nunique() < nunique_thr and nunique_thr >= 100:
-            print("Bottom 1% and Top 1% are dropped from this chart")
             if without_drop_tail:
                 min_ = -np.inf
                 max_ = np.inf
             else:
+                print("Bottom 1% and Top 1% are dropped from this chart")
                 min_ = np.percentile(df_list[0][col].dropna(), 1)
                 max_ = np.percentile(df_list[0][col].dropna(), 99)
             proportion_count_df = proportion_count_df.loc[proportion_count_df[col].between(min_, max_)]
