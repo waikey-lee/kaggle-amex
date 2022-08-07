@@ -47,6 +47,12 @@ def round_dfs(df_list, col, decimals=2, add_new_col=True, nb_workers=8):
         df[new_col] = df[col].parallel_apply(lambda x: round_decimals_down(x, decimals))
     return df_list
 
+# Help to check if binning has been done correctly (via scatterplot)
+def check_binning(df, col, start=0, end=500):
+    temp_col = col + "_"
+    df[[col, temp_col]].drop_duplicates().sort_values(by=col).iloc[start:end].plot.scatter(x=col, y=temp_col)
+    plt.show()
+
 # Manual stack bar (to get a normal bell shape curve)
 def manual_stack(x, start, stack_interval, denom):
     if x >= start:
