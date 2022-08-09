@@ -134,10 +134,10 @@ def plot_target_check(df, column, q=20, return_df=False, figsize=(18, 8),
         return summary
 
 # Plot scatterplot
-def plot_scatterplot(df, column, column2, hue_column=None):
-    fig, ax = plt.subplots(figsize=(18, 10))
+def plot_scatterplot(df, column, column2, hue_column=None, figsize=(18, 10), ticksize=7):
+    fig, ax = plt.subplots(figsize=figsize)
     sns.scatterplot(data=df, x=column, y=column2, hue=hue_column, style=hue_column, 
-                    palette="deep", s=7, legend="full")
+                    s=ticksize, legend="full") # palette="deep", 
     ax.set_title(f"Scatterplot of {column2} (y) against {column} (x)")
     if hue_column is not None:
         ax.legend()
