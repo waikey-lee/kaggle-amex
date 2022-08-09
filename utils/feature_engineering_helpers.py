@@ -3,10 +3,9 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 from utils.feature_group import (
-    CATEGORY_COLUMNS, NON_FEATURE_COLUMNS, 
-    MEAN_FEATURES, MIN_FEATURES, MAX_FEATURES, LAST_FEATURES,           # FIRST LEVEL AGG
-    FIRST_FEATURES, RANGE_FEATURES, VELOCITY_FEATURES, SPEED_FEATURES   # SECOND LEVEL AGG
+    CATEGORY_COLUMNS, NON_FEATURE_COLUMNS
 )
+from utils.eda_helpers import get_cols, insert_row_number
 
 def filter_df_for_feature(df, cond_col, equal_to, rename_suffix, 
                           id_col="customer_ID", drop_cols=NON_FEATURE_COLUMNS):
@@ -17,9 +16,7 @@ def filter_df_for_feature(df, cond_col, equal_to, rename_suffix,
     gc.collect()
     return df_
 
-def get_specific_row_df(raw_df):
-    
-    df = raw_df.copy()
+def get_specific_row_df(df):
     
     # Get last value for all features
     last_df = filter_df_for_feature(
@@ -61,9 +58,6 @@ def get_specific_row_df(raw_df):
     print("Third last entry done")
     gc.collect()
     
-    # Calculate aggregate features
-    cid = pd.Categorical(df.pop('customer_ID'), ordered=True)
-    
     all_df = pd.concat(
         [
             last_df, 
@@ -73,14 +67,11 @@ def get_specific_row_df(raw_df):
         ], 
         axis=1
     )
-    del df, last_df, second_last_df, third_last_df, first_df
+    del df, last_df, second_last_df, first_df
     return all_df
 
 def get_agg_df(df):
-    # df = raw_df.copy()
     
-    # Calculate aggregate features
-    # cid = pd.Categorical(df['customer_ID'], ordered=True)
     cid = 'customer_ID'
     numeric_columns = list(set(df.columns) - set(CATEGORY_COLUMNS) - set(NON_FEATURE_COLUMNS))
     all_columns = list(set(numeric_columns).union(set(CATEGORY_COLUMNS)))
@@ -216,6 +207,7 @@ def get_ma_df(df):
 def feature_gen_pipeline(df):
     cat_columns = set(CATEGORY_COLUMNS).intersection(set(df.columns))
     df.loc[:, cat_columns] = df.loc[:, cat_columns].astype("category")
+    insert_row_number(df)
     agg = get_agg_df(df)
     agg["num_statements"] = (
         df.loc[df["row_number"] == 1][["row_number", "row_number_inv"]].sum(axis=1) - 1
@@ -231,25 +223,32 @@ def feature_gen_pipeline(df):
     
     numeric_columns = list(set(df.columns) - set(CATEGORY_COLUMNS) - set(NON_FEATURE_COLUMNS))
     for col in tqdm(numeric_columns):
+        agg[f"{col}_ma2_r1_r2"] = agg[f"{col}_ma2_r1"] / agg[f"{col}_ma2_r2"]
+        agg = agg.drop(columns=[f"{col}_ma2_r2"])
+        agg[f"{col}_ma2_r1_r3"] = agg[f"{col}_ma2_r1"] / agg[f"{col}_ma2_r3"]
+        agg = agg.drop(columns=[f"{col}_ma2_r3"])
+        agg[f"{col}_ma3_r1_r2"] = agg[f"{col}_ma3_r1"] / agg[f"{col}_ma3_r2"]
+        agg[f"{col}_general_trend"] = 100 * (agg[f"{col}_ma2_r1"] - agg[f"{col}_ma2_first"]) / agg["num_statements"]
+        agg = agg.drop(columns=[f"{col}_ma2_first"])
+        gc.collect()
+        
+        agg[f"{col}_sprint"] = agg[f"{col}_last"] - agg[f"{col}_second_last"]
+        agg[f"{col}_previous_sprint"] = agg[f"{col}_second_last"] - agg[f"{col}_third_last"]
+        agg = agg.drop(columns=[f"{col}_third_last"])
+        agg[f"{col}_acceleration"] = (agg[f"{col}_sprint"] / agg[f"{col}_previous_sprint"]).replace(
+            [np.inf, -np.inf], np.nan
+        )
+        gc.collect()
+        
         agg[f"{col}_range"] = agg[f"{col}_max"] - agg[f"{col}_min"]
         agg[f"{col}_displacement"] = agg[f"{col}_last"] - agg[f"{col}_first"]
         agg[f"{col}_last_first_ratio"] = agg[f"{col}_last"] / agg[f"{col}_first"]
         agg[f"{col}_velocity"] = agg[f"{col}_displacement"] / agg["num_statements"]
-        agg[f"{col}_sprint"] = agg[f"{col}_last"] - agg[f"{col}_second_last"]
-        agg[f"{col}_previous_sprint"] = agg[f"{col}_second_last"] - agg[f"{col}_third_last"]
-        agg[f"{col}_acceleration"] = (agg[f"{col}_sprint"] / (agg[f"{col}_previous_sprint"] * agg[f"{col}_std"])).replace(
-            [np.inf, -np.inf], np.nan
-        )
         agg[f"{col}_last_minus_avg"] = agg[f"{col}_last"] - agg[f"{col}_avg"]
         agg[f"{col}_coef_var"] = (agg[f"{col}_std"] / agg[f"{col}_avg"]).replace([np.inf, -np.inf], np.nan)
-        agg[f"{col}_ma3_r1_r2"] = agg[f"{col}_ma3_r1"] / agg[f"{col}_ma3_r2"]
-        agg[f"{col}_ma2_r1_r2"] = agg[f"{col}_ma2_r1"] / agg[f"{col}_ma2_r2"]
-        agg[f"{col}_ma2_r1_r3"] = agg[f"{col}_ma2_r1"] / agg[f"{col}_ma2_r3"]
-        agg[f"{col}_general_trend"] = 100 * (agg[f"{col}_ma2_r1"] - agg[f"{col}_ma2_first"]) / agg["num_statements"]
         gc.collect()
     
     if "num_statements" in agg.columns:
         agg = agg.drop(columns=["num_statements"])
-    # if "customer_ID" not in agg.columns:
-    #     agg = agg.reset_index().rename(columns={"index": "customer_ID"})
+    
     return agg
