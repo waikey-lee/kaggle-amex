@@ -134,7 +134,7 @@ def plot_target_check(df, column, q=20, return_df=False, figsize=(18, 8),
         return summary
 
 # Plot scatterplot
-def plot_scatterplot(df, column, column2, hue_column=None, figsize=(18, 10), ticksize=7):
+def plot_scatterplot(df, column, column2, hue_column=None, figsize=(18, 10), ticksize=7, **kwargs):
     fig, ax = plt.subplots(figsize=figsize)
     sns.scatterplot(data=df, x=column, y=column2, hue=hue_column, style=hue_column, 
                     s=ticksize, legend="full") # palette="deep", 
