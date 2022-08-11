@@ -70,7 +70,7 @@ def plot_missing_proportion_barchart(df, top_n=30, **kwargs):
 # Check missing value x target distribution
 def plot_target_check(df, column, q=20, return_df=False, figsize=(18, 8), 
                       use_raw_bin=False, strfy_x=False, nunique_thr=100, 
-                      drop_outlier=False, without_drop_tail=False):
+                      drop_outlier=False, without_drop_tail=False, percentile_drop=1):
     null_proportion = df.loc[df[column].isnull()]
     print(f"{null_proportion.shape[0]} null count, {null_proportion.shape[0] / df.shape[0]:.3f} null proportion")
     print(f"{null_proportion['target'].mean():.4f} of the targets have label = 1")
@@ -97,9 +97,9 @@ def plot_target_check(df, column, q=20, return_df=False, figsize=(18, 8),
             min_ = -np.inf
             max_ = np.inf
         else:
-            print("Bottom 1% and Top 1% are dropped from this chart")
-            min_ = np.percentile(df[column].dropna(), 1)
-            max_ = np.percentile(df[column].dropna(), 99)
+            print(f"Top & Bottom {percentile_drop}% are dropped from this chart")
+            min_ = np.percentile(df[column].dropna(), percentile_drop)
+            max_ = np.percentile(df[column].dropna(), 100 - percentile_drop)
         summary = summary.loc[summary[column].between(min_, max_)]
     
     if df[column].nunique() >= nunique_thr and use_raw_bin:
@@ -137,7 +137,7 @@ def plot_target_check(df, column, q=20, return_df=False, figsize=(18, 8),
 def plot_scatterplot(df, column, column2, hue_column=None, figsize=(18, 10), ticksize=7, **kwargs):
     fig, ax = plt.subplots(figsize=figsize)
     sns.scatterplot(data=df, x=column, y=column2, hue=hue_column, style=hue_column, 
-                    s=ticksize, legend="full") # palette="deep", 
+                    s=ticksize, legend="full", **kwargs) # palette="deep", 
     ax.set_title(f"Scatterplot of {column2} (y) against {column} (x)")
     if hue_column is not None:
         ax.legend()
