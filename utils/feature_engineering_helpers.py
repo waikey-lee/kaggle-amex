@@ -73,7 +73,8 @@ def get_specific_row_df(df):
 def get_agg_df(df):
     
     cid = 'customer_ID'
-    numeric_columns = list(set(df.columns) - set(CATEGORY_COLUMNS) - set(NON_FEATURE_COLUMNS))
+    infer_cat_columns = set(df.select_dtypes("category").columns)
+    numeric_columns = list(set(df.columns) - set(CATEGORY_COLUMNS) - set(NON_FEATURE_COLUMNS) - infer_cat_columns)
     all_columns = list(set(numeric_columns).union(set(CATEGORY_COLUMNS)))
     
     avg_ = (df
@@ -221,7 +222,8 @@ def feature_gen_pipeline(df):
     agg = agg.merge(ma_df, left_index=True, right_index=True, how="inner")
     del ma_df
     
-    numeric_columns = list(set(df.columns) - set(CATEGORY_COLUMNS) - set(NON_FEATURE_COLUMNS))
+    infer_cat_columns = set(df.select_dtypes("category").columns)
+    numeric_columns = list(set(df.columns) - set(CATEGORY_COLUMNS) - set(NON_FEATURE_COLUMNS) - infer_cat_columns)
     for col in tqdm(numeric_columns):
         agg[f"{col}_ma2_r1_r2"] = agg[f"{col}_ma2_r1"] / agg[f"{col}_ma2_r2"]
         agg = agg.drop(columns=[f"{col}_ma2_r2"])
