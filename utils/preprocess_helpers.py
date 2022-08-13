@@ -18,7 +18,7 @@ def split_public_private(test):
     return public_test, private_test
 
 # Clip column based on percentile or exact value
-def clip_col(df, col, percentile=True, top_pct=1, btm_pct=1, top_value=np.inf, btm_value=-np.inf, add_new_col=True):
+def clip_col(df, col, percentile=False, top_pct=1, btm_pct=1, top_value=None, btm_value=None, add_new_col=True):
     if add_new_col:
         new_col = col + "_"
     else:
@@ -26,8 +26,11 @@ def clip_col(df, col, percentile=True, top_pct=1, btm_pct=1, top_value=np.inf, b
     if percentile:
         top_value = np.percentile(df[col].dropna(), top_pct)
         btm_value = np.percentile(df[col].dropna(), btm_pct)
-    df[new_col] = np.where(df[col] < btm_value, btm_value, df[col])
-    df[new_col] = np.where(df[new_col] > top_value, top_value, df[new_col])
+    if top_value is not None:
+        df[new_col] = np.where(df[col] > top_value, top_value, df[col])
+        col = new_col
+    if btm_value is not None:
+        df[new_col] = np.where(df[col] < btm_value, btm_value, df[col])
     return df
 
 # Round down decimal as the noise in Amex is being added
@@ -108,8 +111,3 @@ def manual_mapping(train, test, col, mapping_dict, add_new_col=True):
 
 def integerize(series, dtype=np.int32):
     return series.fillna(-127).astype(dtype)
-
-# def search_for_best_trim(df, col):
-#     temp_col = col + "_"
-#     df[temp_col] = np.where(df[col] < -0.6, -0.6, df[col])
-#     df[temp_col] = np.where(df[temp_col] > 1.5, 1.5, df[temp_col])
