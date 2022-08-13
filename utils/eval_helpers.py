@@ -49,6 +49,15 @@ def lgb_amex_metric(y_pred, train_data):
             amex_metric(y_true, y_pred)[0],
             True)
 
+# Return the ROC AUC of the single column
+def check_roc_auc(df, col, target_col="target"):
+    temp = df[[target_col, col]].dropna().reset_index(drop=True)
+    auc = roc_auc_score(temp[target_col], temp[col])
+    if auc < 0.5:
+        return 1 - auc
+    else:
+        return auc
+    
 # Plot ROC AUC curves for both train and test
 def plot_roc_curves(legits_list, pred_probs_list, labels=["Train", "Test"], title=None):
     fig, ax = plt.subplots(figsize=(15, 8))
