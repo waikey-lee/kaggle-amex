@@ -11,6 +11,13 @@ from cycler import cycler
 from IPython.display import display
 from colorama import Fore, Back, Style
 
+# Return the summary stats for all datasets
+def describe_all(df_list, col, name_list=["train", "public test", "private test"]):
+    desc_list = []
+    for df, name in zip(df_list, name_list):
+        desc_list.append(df[col].describe().rename(index=name))
+    return pd.concat(desc_list, axis=1)
+
 # Insert row number to indicate which credit card statement for each particular record
 def insert_row_number(df):
     if "row_number_inv" not in df.columns:
@@ -164,8 +171,11 @@ def plot_int_feature_distribution(train, test, col):
 
     plt.show()
     
-def plot_train_test_distribution(df_list, col, figsize=(18, 8), q=100, 
+def plot_train_test_distribution(df_list, col, figsize=(18, 8), q=100, is_category=False,
                                  nunique_thr=100, return_df=False, without_drop_tail=False):
+    if is_category:
+        for df in df_list:
+            df[col] = df[col].astype(float)
     if len(df_list) == 3:
         color_list = ["yellow", "orange", "green"]
         name_list = ["Train", "PublicTest", "PrivateTest"]
