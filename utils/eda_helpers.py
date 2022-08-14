@@ -11,6 +11,13 @@ from cycler import cycler
 from IPython.display import display
 from colorama import Fore, Back, Style
 
+# Print percentile
+def print_percentile(df_list, col, percentile):
+    name_list = ["train", "public test", "private test"]
+    print(f"{percentile}th percentile:")
+    for name, df in zip(name_list, df_list):
+        print(name, ":", np.percentile(df[col].dropna(), percentile))
+    
 # Check summary df
 def check_summary(df, col):
     check_df = df.groupby("customer_ID")[col].agg(["max", "min", "mean", "std"]).reset_index()
@@ -21,7 +28,9 @@ def describe_all(df_list, col, name_list=["train", "public test", "private test"
     desc_list = []
     for df, name in zip(df_list, name_list):
         desc_list.append(df[col].describe().rename(index=name))
-    return pd.concat(desc_list, axis=1)
+    summary = pd.concat(desc_list, axis=1)
+    summary.loc["null_proportion", :] = [df[col].isnull().sum() / df.shape[0] for df in df_list]
+    return summary
 
 # Insert row number to indicate which credit card statement for each particular record
 def insert_row_number(df):
