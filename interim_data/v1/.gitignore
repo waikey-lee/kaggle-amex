@@ -1,2 +1,5 @@
 train_parquet/
 test_parquet/
+*.csv
+*.pkl
+*.parquet
