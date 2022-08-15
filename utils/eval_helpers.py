@@ -325,3 +325,39 @@ class TreeExperiment:
             (pivoted_feature_imp_df["base_feature"].str.contains("_")) & 
             (pivoted_feature_imp_df["base_feature"].str.len() < 10)
         ]
+        
+# Check score distribution
+def plot_score_distribution(df, bins=np.arange(-10, 10, 0.1), score_col="cv_score", figsize=(28, 12)):
+    
+    df["bin"] = pd.cut(df[score_col], bins)
+    df["bin"] = df["bin"].cat.codes.astype(str).str.zfill(3) + "." +  df["bin"].astype(str)
+    
+    count_df = df.groupby("bin")["target"].count().reset_index().rename(columns={"target": "count"})
+    mean_df = df.groupby("bin")["target"].mean().reset_index().rename(columns={"target": "mean"})
+    
+    # if "count" not in df.columns:
+    #     df = df.merge(
+    #         count_df, 
+    #         on="bin", 
+    #         how='left'
+    #     )
+    # if "mean" not in df.columns:
+    #     df = df.merge(
+    #         mean_df, 
+    #         on="bin", 
+    #         how='left'
+    #     )
+    
+    df = count_df.merge(
+            mean_df, 
+            on="bin", 
+            how='left'
+    )
+    fig, ax = plt.subplots(figsize=figsize)
+    sns.barplot(data=count_df, x=count_df["bin"], y=count_df["count"], ax=ax)
+    ax2 = ax.twinx()
+    sns.lineplot(data=mean_df, x="bin", y="mean", ax=ax2)
+    ax.tick_params(axis='x', labelrotation=45)
+    plt.show()
+    
+    return df
