@@ -11,6 +11,11 @@ from cycler import cycler
 from IPython.display import display
 from colorama import Fore, Back, Style
 
+# Filter dataframe by statement number
+def filter_df(df, which_statement=1, id_col="row_number"):
+    if isinstance(which_statement, int):
+        return df.loc[df[id_col] == which_statement]
+
 # Print percentile
 def print_percentile(df_list, col, percentile):
     name_list = ["train", "public test", "private test"]
@@ -91,7 +96,7 @@ def plot_missing_proportion_barchart(df, top_n=30, **kwargs):
 # Check missing value x target distribution
 def plot_target_check(df, column, q=20, return_df=False, figsize=(18, 8), 
                       use_raw_bin=False, strfy_x=False, nunique_thr=100, 
-                      drop_outlier=False, without_drop_tail=False, percentile_drop=1):
+                      drop_outlier=False, without_drop_tail=True, percentile_drop=1):
     null_proportion = df.loc[df[column].isnull()]
     print(f"{null_proportion.shape[0]} null count, {null_proportion.shape[0] / df.shape[0]:.3f} null proportion")
     print(f"{null_proportion['target'].mean():.4f} of the targets have label = 1")
