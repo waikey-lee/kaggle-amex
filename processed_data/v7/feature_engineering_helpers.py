@@ -39,36 +39,36 @@ def get_specific_row_df(df):
     print("First entry done")
     gc.collect()
     
-    # Get previous value (2nd last) for all features, there will be some missing (for those having only single statement)
-    second_last_df = filter_df_for_feature(
-        df, 
-        cond_col="row_number", 
-        equal_to=2, 
-        rename_suffix="second_last"
-    )
-    print("Second last entry done")
-    gc.collect()
+#     # Get previous value (2nd last) for all features, there will be some missing (for those having only single statement)
+#     second_last_df = filter_df_for_feature(
+#         df, 
+#         cond_col="row_number", 
+#         equal_to=2, 
+#         rename_suffix="second_last"
+#     )
+#     print("Second last entry done")
+#     gc.collect()
     
-    # Get previous value (3rd last) for all features, there will be some missing (for those having only single statement)
-    third_last_df = filter_df_for_feature(
-        df, 
-        cond_col="row_number", 
-        equal_to=3, 
-        rename_suffix="third_last"
-    )
-    print("Third last entry done")
-    gc.collect()
+#     # Get previous value (3rd last) for all features, there will be some missing (for those having only single statement)
+#     third_last_df = filter_df_for_feature(
+#         df, 
+#         cond_col="row_number", 
+#         equal_to=3, 
+#         rename_suffix="third_last"
+#     )
+#     print("Third last entry done")
+#     gc.collect()
     
     all_df = pd.concat(
         [
             last_df, 
-            second_last_df,
-            third_last_df,
+            # second_last_df,
+            # third_last_df,
             first_df,
         ], 
         axis=1
     )
-    del df, last_df, second_last_df, first_df
+    del df, last_df, first_df #, second_last_df, third_last_df
     return all_df
 
 def get_agg_df(df):
