@@ -7,9 +7,65 @@ import numpy as np
 import os
 import pandas as pd
 import seaborn as sns
+from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split, StratifiedKFold
 from sklearn.metrics import roc_curve, roc_auc_score, precision_recall_curve, average_precision_score
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from tqdm import tqdm
+from utils.common import sigmoid, reverse_sigmoid
+
+# Train a logistic regression unit on the OOF scores of my models
+def train_logistic_regression(X_train, y_train, preprocess=None, 
+                              verbose=0, random_state=42):
+    scaler = None
+    if preprocess is None:
+        X_train_ = np.array(X_train)
+    elif preprocess == "minmax":
+        scaler = MinMaxScaler()
+        X_train_ = scaler.fit_transform(X_train)
+    elif preprocess == "standard":
+        scaler = StandardScaler()
+        X_train_ = scaler.fit_transform(X_train)
+    elif preprocess == "sigmoid":
+        X_train_ = X_train.copy()
+        for col in X_train.columns:
+            X_train_[col] = sigmoid(X_train[col])
+        X_train_ = np.array(X_train)
+    elif preprocess == "reverse_sigmoid":
+        X_train_ = X_train.copy()
+        for col in X_train.columns:
+            X_train_[col] = reverse_sigmoid(X_train[col])
+        X_train_ = np.array(X_train)
+    else:
+        X_train_ = np.array(X_train)
+        print("GG preprocessing unknown")
+    
+    kf = StratifiedKFold(n_splits=5, shuffle=True, random_state=random_state)
+    metrics, train_metrics = [], []
+    clf_list = []
+    for fold, (idx_tr, idx_va) in zip(range(1, 5+1), kf.split(X_train_, y_train)):
+        X_tr, X_va = X_train_[idx_tr], X_train_[idx_va]
+        y_tr, y_va = y_train[idx_tr], y_train[idx_va]
+        clf = LogisticRegression(
+            random_state=0,
+            class_weight=[0.8, 0.2],
+            penalty="l2"
+        )
+        clf.fit(X_tr, y_tr)
+        clf_list.append(clf)
+        y_train_pred = clf.predict_proba(X_tr)[:, 1]
+        y_pred = clf.predict_proba(X_va)[:, 1]
+        train_metric = amex_metric(y_tr.values, y_train_pred)[0]
+        metric = amex_metric(y_va.values, y_pred)[0]
+        metrics.append(metric)
+        train_metrics.append(train_metric)
+        
+    if verbose:
+        print(fold, train_metric, metric)
+    
+    df = pd.DataFrame(dict(val_amex_metric=metrics,
+                           train_amex_metric=train_metrics))
+    return df, clf_list, scaler
 
 # Function to calculate overall amex metric, Gini, and 4% Positive capture rate
 def amex_metric(y_true: np.array, y_pred: np.array) -> float:
@@ -122,16 +178,16 @@ def amex_metric_np(preds: np.ndarray, target: np.ndarray) -> float:
     return 0.5 * (g + d), g, d
 
 # Get evaluation df
-def get_final_metric_df(X: pd.DataFrame, y_true: pd.DataFrame, y_pred: pd.DataFrame):
-    df = (pd.concat([X, y_true, y_pred], axis='columns').sort_values('prediction', ascending=False))
-    df['weight'] = df['target'].apply(lambda x: 20 if x==0 else 1)
+def get_final_metric_df(df, pred_col="prediction", target_col="target"):
+    df = df.sort_values(pred_col, ascending=False)
+    df['weight'] = df[target_col].apply(lambda x: 20 if x==0 else 1)
     four_pct_cutoff = int(0.04 * df['weight'].sum())
     df['weight_cumsum'] = df['weight'].cumsum()
     df["is_cutoff"] = 0
     df.loc[df['weight_cumsum'] <= four_pct_cutoff, "is_cutoff"] = 1
     df['random'] = (df['weight'] / df['weight'].sum()).cumsum()
     total_pos = (df['target'] * df['weight']).sum()
-    df['cum_pos_found'] = (df['target'] * df['weight']).cumsum()
+    df['cum_pos_found'] = (df[target_col] * df['weight']).cumsum()
     df['lorentz'] = df['cum_pos_found'] / total_pos
     df['gini'] = (df['lorentz'] - df['random']) * df['weight']
     return df
@@ -160,8 +216,9 @@ def calc_amex_metric_from_df(df, ground_truth="target", prediction="raw_score"):
     return 0.5 * (g + d), g, d
 
 class TreeExperiment:
-    def __init__(self, exp_full_path, seed=None):
+    def __init__(self, exp_full_path, model_path="models", seed=None):
         self.path = exp_full_path
+        self.model_path = model_path
         self.target = []
         self.seed = seed
         self.models = {}
@@ -178,9 +235,9 @@ class TreeExperiment:
     
     # To read all (usually 5) models from the experiment's directory
     def read_models(self):
-        model_paths = [file for file in sorted(os.listdir(f"{self.path}/models")) if file.startswith("model")]
+        model_paths = [file for file in sorted(os.listdir(f"{self.path}/{self.model_path}")) if file.startswith("model")]
         for i, model_path in enumerate(model_paths):
-            self.models[i] = joblib.load(f"{self.path}/models/{model_path}")
+            self.models[i] = joblib.load(f"{self.path}/{self.model_path}/{model_path}")
     
     # To retrieve the list of feature names, as well as their respective feature importances
     # Currently support only CatBoost Classifier & LGBM Booster
@@ -335,19 +392,6 @@ def plot_score_distribution(df, bins=np.arange(-10, 10, 0.1), score_col="cv_scor
     count_df = df.groupby("bin")["target"].count().reset_index().rename(columns={"target": "count"})
     mean_df = df.groupby("bin")["target"].mean().reset_index().rename(columns={"target": "mean"})
     
-    # if "count" not in df.columns:
-    #     df = df.merge(
-    #         count_df, 
-    #         on="bin", 
-    #         how='left'
-    #     )
-    # if "mean" not in df.columns:
-    #     df = df.merge(
-    #         mean_df, 
-    #         on="bin", 
-    #         how='left'
-    #     )
-    
     df = count_df.merge(
             mean_df, 
             on="bin", 
@@ -361,3 +405,56 @@ def plot_score_distribution(df, bins=np.arange(-10, 10, 0.1), score_col="cv_scor
     plt.show()
     
     return df
+
+# Train a KNN model on the OOF scores of my models
+def train_knn(X_train, y_train, preprocess=None, verbose=0, random_state=42):
+    scaler = None
+    if preprocess is None:
+        X_train_ = np.array(X_train)
+    elif preprocess == "minmax":
+        scaler = MinMaxScaler()
+        X_train_ = scaler.fit_transform(X_train)
+    elif preprocess == "standard":
+        scaler = StandardScaler()
+        X_train_ = scaler.fit_transform(X_train)
+    elif preprocess == "sigmoid":
+        X_train_ = X_train.copy()
+        for col in X_train.columns:
+            X_train_[col] = sigmoid(X_train[col])
+        X_train_ = np.array(X_train)
+    elif preprocess == "reverse_sigmoid":
+        X_train_ = X_train.copy()
+        for col in X_train.columns:
+            X_train_[col] = reverse_sigmoid(X_train[col])
+        X_train_ = np.array(X_train)
+    else:
+        X_train_ = np.array(X_train)
+        print("GG preprocessing unknown")
+    
+    kf = StratifiedKFold(n_splits=5, shuffle=True, random_state=random_state)
+    metrics, train_metrics = [], []
+    clf_list = []
+    for fold, (idx_tr, idx_va) in zip(range(1, 5+1), kf.split(X_train_, y_train)):
+        X_tr, X_va = X_train_[idx_tr], X_train_[idx_va]
+        y_tr, y_va = y_train[idx_tr], y_train[idx_va]
+        clf = KNeighborsClassifier(
+            n_neighbors=19,
+            algorithm="ball_tree",
+            leaf_size=12,
+            p=1
+        )
+        clf.fit(X_tr, y_tr)
+        clf_list.append(clf)
+        y_train_pred = clf.predict_proba(X_tr)[:, 1]
+        y_pred = clf.predict_proba(X_va)[:, 1]
+        train_metric = amex_metric(y_tr.values, y_train_pred)[0]
+        metric = amex_metric(y_va.values, y_pred)[0]
+        metrics.append(metric)
+        train_metrics.append(train_metric)
+        
+    if verbose:
+        print(fold, train_metric, metric)
+    
+    df = pd.DataFrame(dict(val_amex_metric=metrics,
+                           train_amex_metric=train_metrics))
+    return df, clf_list, scaler
