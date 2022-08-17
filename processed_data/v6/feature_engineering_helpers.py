@@ -6,6 +6,7 @@ from utils.feature_group import (
     CATEGORY_COLUMNS, NON_FEATURE_COLUMNS
 )
 from utils.eda_helpers import get_cols, insert_row_number
+from utils.preprocess_helpers import clip_col
 
 def filter_df_for_feature(df, cond_col, equal_to, rename_suffix, 
                           id_col="customer_ID", drop_cols=NON_FEATURE_COLUMNS):
@@ -245,3 +246,50 @@ def feature_gen_pipeline(df):
     keep_columns = list(set(agg.columns) - set(drop_columns))
     # agg = agg.loc[:, keep_columns]
     return agg, keep_columns
+
+# Data format conversion logic
+def convert_all(agg_df, tol=1e-4):
+    float64_columns = agg_df.select_dtypes("float64").columns.tolist()
+    for col in tqdm(float64_columns):
+        temp = agg_df[col].astype(np.float32).values
+        if (temp - agg_df[col]).abs().max() < tol:
+            agg_df[col] = agg_df[col].astype(np.float32)
+    return agg_df
+
+# Clipping logic
+def clip_all(agg_df, max_thr=1e3, min_thr=-1e3):
+    # Clip upper bound
+    max_ = agg_df.max()
+    max_columns = max_[max_ > max_thr].index.tolist()
+    for col in tqdm(max_columns):
+        max_threshold1 = np.percentile(agg_df[col].dropna(), 99.9)
+        max_threshold2 = np.percentile(agg_df[col].dropna(), 99)
+        if max_threshold1 <= max_thr:
+            agg_df = clip_col(agg_df, col, top_value=max_threshold1, add_new_col=False)
+        elif max_threshold2 <= max_thr:
+            agg_df = clip_col(agg_df, col, top_value=max_threshold2, add_new_col=False)
+        else:
+            agg_df = clip_col(agg_df, col, top_value=max_thr, add_new_col=False)
+    
+    # Clip lower bound
+    min_ = agg_df.min()
+    min_columns = min_[min_ < min_thr].index.tolist()
+    for col in tqdm(min_columns):
+        min_threshold1 = np.percentile(agg_df[col].dropna(), 0.1)
+        min_threshold2 = np.percentile(agg_df[col].dropna(), 1)
+        if min_threshold1 >= min_thr:
+            agg_df = clip_col(agg_df, col, btm_value=min_threshold1, add_new_col=False)
+        elif min_threshold2 >= min_thr:
+            agg_df = clip_col(agg_df, col, btm_value=min_threshold2, add_new_col=False)
+        else:
+            agg_df = clip_col(agg_df, col, btm_value=min_thr, add_new_col=False)
+    return agg_df
+            
+# Rounding logic
+def round_all(agg_df, round_to=3, tol=1e-4):
+    number_columns = agg_df.select_dtypes(np.number).columns.tolist()
+    for col in tqdm(number_columns):
+        temp = agg_df[col].round(round_to)
+        if (temp - agg_df[col]).abs().max() < tol:
+            agg_df[col] = agg_df[col].round(round_to)
+    return agg_df
