@@ -10,6 +10,7 @@ from matplotlib.colors import ListedColormap
 from cycler import cycler
 from IPython.display import display
 from colorama import Fore, Back, Style
+from scipy.stats import chi2_contingency
 
 # Filter dataframe by statement number
 def filter_df(df, which_statement=1, id_col="row_number"):
@@ -367,3 +368,40 @@ def calculate_psi(expected, actual, buckettype='bins', buckets=1000, axis=0):
             psi_values[i] = psi(expected[i,:], actual[i,:], buckets)
 
     return(psi_values)
+
+# Count the number of unqiue and Nulls across Train, Public Test & Private Test
+def generate_nunique_and_nulls(df_list):
+    nunique_df = pd.DataFrame(dict(
+        train_nunique=df_list[0].nunique(),
+        public_test_nunique=df_list[1].nunique(),
+        private_test_nunique=df_list[2].nunique()
+    ))
+    diff_nunique_indices = ~nunique_df[["train_nunique", "public_test_nunique", "private_test_nunique"]].eq(
+        nunique_df.loc[:, "train_nunique"], 
+        axis=0
+    ).all(1)
+    diff_nunique_df = nunique_df.loc[diff_nunique_indices]
+    
+    null_df = pd.DataFrame(dict(
+        train_null=df_list[0].isnull().sum() / df_list[0].shape[0],
+        public_test_null=df_list[1].isnull().sum() / df_list[1].shape[0],
+        private_test_null=df_list[2].isnull().sum() / df_list[2].shape[0],
+    ))
+    diff_null_indices = ~null_df[["train_null", "public_test_null", "private_test_null"]].eq(
+        null_df.loc[:, "train_null"], 
+        axis=0
+    ).all(1)
+    diff_null_df = null_df.loc[diff_null_indices]
+    return diff_nunique_df, diff_null_df
+
+# def calc_chi_square_test_p_value(train, column1, column2, plot=False):
+#     t = train.groupby([column1, column2]).agg(customer_count=("customer_ID", "count")).reset_index()
+#     pivot = pd.pivot_table(t, index=column1, columns=column2, values="customer_count").fillna(0)
+#     if plot:
+#         plot_heatmap(pivot, annot=True, fmt=".0f")
+#     stat, p, dof, expected = chi2_contingency(pivot)
+#     return p
+
+# for col1, col2 in combinations(binary_columns, 2):
+#     p_value = calc_chi_square_test_p_value(train, col1, col2)
+#     print(col1, col2, p_value)
