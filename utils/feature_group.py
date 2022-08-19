@@ -16,24 +16,6 @@ CATEGORY_COLUMNS = [
     'S_binaries', 'R_binaries', 'B_binaries', 'D_binaries'
 ]
 
-PRODUCT_FEATURES = {
-    "B_2": ["P_2"],
-    "B_4": ["D_43", "S_3"],
-    "D_59": ["D_124"],
-    "P_2": ["D_47", "D_54", "D_112", "P_3"],
-    "P_3": ["B_24", "D_54", "D_112"],
-    "S_3": ["D_124"],
-}
-
-RATIO_FEATURES = {
-    "B_4": ["D_47", "P_3"],
-    "B_24": ["P_2", "P_3"],
-    "D_43": ["D_47"],
-    "D_59": ["P_2", "P_3"],
-    "D_124": ["D_47"], 
-    "S_3": ["P_2"]
-}
-
 # Numeric columns (Requires no extra rounding)
 CONTINUOUS_COLUMNS = [
     'B_1', 'B_2', 'B_3', 'B_4', 'B_5', 'B_6', 'B_7', 'B_9', 
@@ -55,4 +37,17 @@ CONTINUOUS_COLUMNS = [
     'S_3', 'S_5', 'S_7', 'S_9', 
     'S_12', 'S_16', 'S_17', 'S_19', 
     'S_22', 'S_23', 'S_24', 'S_26', 'S_27', 
+]
+
+BINARY_FEATURES = [
+    "R_2", "R_4", "R_7", "R_13", "R_14", "R_15", "R_17", "R_18", "R_19", 
+    "R_20", "R_21", "R_22", "R_23", "R_24", "R_25", "R_28"
+]
+
+INTEGER_FEATURES = [
+    "R_1", "R_3", "R_5", "R_8", "R_9", "R_10", "R_11", "R_16", "R_26", "R_27"
+]
+
+CONTINUOUS_FEATURES = [
+    "R_6", "R_12", 
 ]
