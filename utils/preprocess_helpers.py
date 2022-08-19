@@ -57,15 +57,15 @@ def round_decimals_down(number:float, decimals:int=2):
 
 # Round all dataframe in df_list (Train, PB_Test, PV_Test)
 def round_dfs(df_list, col, decimals=2, add_new_col=True, nb_workers=8):
-    print(f"Before round, Train-Private PSI = {check_psi(df_list, col)[1]:.4f}")
+    # print(f"Before round, Train-Private PSI = {check_psi(df_list, col)[1]:.4f}")
     if add_new_col:
         new_col = col + "_"
     else:
         new_col = col
-    pandarallel.initialize(nb_workers=nb_workers, progress_bar=False, use_memory_fs=False)
+    # pandarallel.initialize(nb_workers=nb_workers, progress_bar=False, use_memory_fs=False)
     for df in df_list:
         df[new_col] = df[col].parallel_apply(lambda x: round_decimals_down(x, decimals))
-    print(f"After round, Train-Private PSI = {check_psi(df_list, new_col)[1]:.4f}")
+    # print(f"After round, Train-Private PSI = {check_psi(df_list, new_col)[1]:.4f}")
     return df_list
 
 # Help to check if binning has been done correctly (via scatterplot)
