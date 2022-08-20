@@ -4,3 +4,5 @@
 models/
 gbdt_models/
 dart_models/
+catboost_info/
+
