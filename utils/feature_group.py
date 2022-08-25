@@ -11,9 +11,8 @@ NON_FEATURE_COLUMNS = [
 # Categorical columns indicate the columns can be set as categorical
 CATEGORY_COLUMNS = [
     'B_30', 'B_38', 
-    'D_63', 'D_64', 'D_68', 'D_92', 
-    'D_114', 'D_116', 'D_117', 'D_120', 'D_126',
-    'S_binaries', 'R_binaries', 'B_binaries', 'D_binaries'
+    'D_63', 'D_64', 'D_68', 
+    'D_114', 'D_117', 'D_120', 'D_126'
 ]
 
 # Numeric columns (Requires no extra rounding)

@@ -83,16 +83,18 @@ def plot_bar(df, cat_col, num_col="count", title=None,
     plt.show()
     
 # Function to plot simple barchart for missing data checking
-def plot_missing_proportion_barchart(df, top_n=30, **kwargs):
+def plot_missing_proportion_barchart(df, top_n=30, show_plot=True, return_df=True, **kwargs):
     missing_prop_df = pd.DataFrame(check_missing_values(df).items(), 
                                    columns=["column", "missing_proportion"])
     missing_prop_df = missing_prop_df.sort_values(by="missing_proportion", 
                                                   ascending=False)
-    plot_bar(missing_prop_df.iloc[:top_n], 
-             cat_col="column",
-             num_col="missing_proportion",
-             **kwargs)
-    return missing_prop_df
+    if show_plot:
+        plot_bar(missing_prop_df.iloc[:top_n], 
+                 cat_col="column",
+                 num_col="missing_proportion",
+                 **kwargs)
+    if return_df:
+        return missing_prop_df
 
 # Check missing value x target distribution
 def plot_target_check(df, column, q=20, return_df=False, figsize=(18, 8), 

@@ -16,7 +16,7 @@ from utils.common import sigmoid, reverse_sigmoid
 
 # Train a logistic regression unit on the OOF scores of my models
 def train_logistic_regression(X_train, y_train, preprocess=None, 
-                              verbose=0, random_state=42):
+                              verbose=0, random_state=42, class_weight=[0.8, 0.2]):
     scaler = None
     if preprocess is None:
         X_train_ = np.array(X_train)
@@ -48,7 +48,7 @@ def train_logistic_regression(X_train, y_train, preprocess=None,
         y_tr, y_va = y_train[idx_tr], y_train[idx_va]
         clf = LogisticRegression(
             random_state=0,
-            class_weight=[0.8, 0.2],
+            class_weight=class_weight,
             penalty="l2"
         )
         clf.fit(X_tr, y_tr)
